@@ -24,20 +24,34 @@ class WinduCore(object):
         # so the mediator knows where to emit the signal.
         self.mediator = Mediator(self.gui)
 
-        self.__init__connect_signals()
+        self.__init__signals(connect=True)
 
-        # Start the video thread
+        # Start the video thread, also concurrent threads
         self.start_video_thread()
 
-    def __init__connect_signals(self):
+        self.__init__cmd()
+
+    def __init__signals(self, connect=True):
         '''
         Call the mediator to connect signals to the gui.
         These are the signals to be emitted dynamically during runtime.
 
         Each signal is defined by a unique str signal name.
+
+        The parameter 'connect' specifies whether connect or disconnect signals.
         '''
         signal_names = ['display_topography', 'progress_update']
-        self.mediator.connect_signals(signal_names)
+
+        if connect:
+            self.mediator.connect_signals(signal_names)
+        else:
+            self.mediator.disconnect_signals(signal_names)
+
+    def __init__cmd(self):
+        '''
+        Some high-level commands to be executed upon the software is initiated
+        '''
+        self.auto_offset()
 
     def start_video_thread(self):
         # Pass the mediator into the video thread,
@@ -45,58 +59,35 @@ class WinduCore(object):
         self.video_thread = VideoThread(mediator_obj = self.mediator)
         self.video_thread.start()
 
+        # The self.align_thread is dependent on self.video_thread
+        self.align_thread = AlignThread(video_thread_obj = self.video_thread)
+        self.align_thread.start()
+
     def stop_video_thread(self):
+        # The self.align_thread depends self.video_thread,
+        # so close the align_thread first
+        self.align_thread.stop()
         self.video_thread.stop()
 
     def close(self):
         'Should be called upon software termination.'
         self.stop_video_thread()
 
+        # Disconnect signals from the gui object
+        self.__init__signals(connect=False)
+
     # Methods called by the controller object
 
     def snapshot(self):
         if self.video_thread:
-            cv2.imwrite('snapshot.jpg', self.video_thread.imgC)
+            cv2.imwrite('snapshot.jpg', self.video_thread.imgDisplay)
 
     def toggle_recording(self):
         if self.video_thread:
             self.video_thread.toggle_recording()
 
     def auto_offset(self):
-        '''
-        1) Take current right and left images from the video thread.
-        2) Use correlation function to calculate the offset.
-        3) Set the offset parameters of the video thread object
-        '''
-        if self.video_thread is None:
-            return
-
-        imgR = cv2.cvtColor(self.video_thread.imgR_0, cv2.COLOR_BGR2GRAY)
-        imgL = cv2.cvtColor(self.video_thread.imgL_0, cv2.COLOR_BGR2GRAY)
-
-        if not imgR.shape == imgL.shape:
-            return
-
-        row, col = imgL.shape
-        a = int(row*0.25)
-        b = int(row*0.75)
-        c = int(col*0.25)
-        d = int(col*0.75)
-        roiL = np.float32( imgL[a:b, c:d] )
-
-        mat = cv2.matchTemplate(image  = np.float32(imgR)   ,
-                                templ  = roiL               ,
-                                method = cv2.TM_CCORR_NORMED)
-
-        # Vertical alignment, should always be done
-        y_max = cv2.minMaxLoc(mat)[3][1]
-        offset_y = y_max - row / 4
-
-        # Horizontal alignment, for infinitely far objects
-        x_max = cv2.minMaxLoc(mat)[3][0]
-        offset_x = x_max - col / 4
-
-        self.video_thread.set_offset(offset_x, offset_y)
+        self.video_thread.auto_offset(setting_x_offset=True)
 
     def zoom_in(self):
         if self.video_thread:
@@ -257,8 +248,49 @@ class WinduCore(object):
         if self.video_thread:
             self.video_thread.apply_camera_parameters(parameters)
 
+        fh = open('parameters/cam.json', 'r')
+        saved_parameters = json.loads(fh.read())
+
+        for key in parameters:
+            saved_parameters[key] = parameters[key]
+
+        json.dump(saved_parameters, open('parameters/cam.json', 'w'))
+
     def toggle_depth_map(self):
-        self.video_thread.isComputingDepth = not self.video_thread.isComputingDepth
+        self.video_thread.computingDepth = not self.video_thread.computingDepth
+
+    def set_display_size(self, dim):
+        '''
+        Args:
+            dim: a tuple of (width, height)
+        '''
+        self.video_thread.set_display_size(width=dim[0], height=dim[1])
+
+    def start_select_cam(self):
+        self.stop_video_thread()
+
+        self.cam_select_thread = CamSelectThread(mediator_obj = self.mediator)
+        self.cam_select_thread.start()
+
+    def save_cam_id(self, data):
+
+        id = data['id']
+        which_side = data['which_side']
+
+        fh = open('parameters/cam.json', 'r')
+        parm_vals = json.loads(fh.read())
+
+        if which_side == 'L':
+            parm_vals['camL_id'] = id
+        elif which_side == 'R':
+            parm_vals['camR_id'] = id
+        else:
+            return
+
+        json.dump(parm_vals, open('parameters/cam.json', 'w'))
+
+    def next_cam(self):
+        self.cam_select_thread.isWaiting = False
 
 
 
@@ -276,18 +308,24 @@ class VideoThread(threading.Thread):
         # Mediator emits signal to the gui object
         self.mediator = mediator_obj
 
-        self.__init__connect_signals()
+        self.__init__signals(connect=True)
         self.__init__parms()
 
-    def __init__connect_signals(self):
+    def __init__signals(self, connect=True):
         '''
         Call the mediator to connect signals to the gui.
         These are the signals to be emitted dynamically during runtime.
 
         Each signal is defined by a unique str signal name.
+
+        The parameter 'connect' specifies whether connect or disconnect signals.
         '''
         signal_names = ['display_image', 'recording_starts', 'recording_ends', 'set_info_text']
-        self.mediator.connect_signals(signal_names)
+
+        if connect:
+            self.mediator.connect_signals(signal_names)
+        else:
+            self.mediator.disconnect_signals(signal_names)
 
     def __init__parms(self):
         # Parameters for image processing
@@ -295,19 +333,19 @@ class VideoThread(threading.Thread):
         self.set_offset_matrix()
         self.img_height, self.img_width, _ = self.cams.read()[0].shape
         self.zoom = 1.0
-        self.screen_width, self.screen_height = 1136, 640
-        self.imgC = np.zeros( (self.screen_height, self.screen_width, 3), np.uint8 )
+        self.display_width, self.display_height = 1136, 640
         self.set_resize_matrix()
 
         # Parameters for stereo depth map
         self.ndisparities = 32 # Must be divisible by 16
         self.SADWindowSize = 31 # Must be odd, be within 5..255 and be not larger than image width or height
 
-        # Parameters for administrative logic
-        self.isRecording = False
-        self.isStop = False
-        self.isPause = False
-        self.isComputingDepth = False
+        # Parameters for looping, control and timing
+        self.recording = False
+        self.stopping = False
+        self.pausing = False
+        self.isPaused = False
+        self.computingDepth = False
         self.t_0 = time.time()
         self.t_1 = time.time()
 
@@ -321,22 +359,31 @@ class VideoThread(threading.Thread):
     def set_resize_matrix(self):
         '''
         Define the matrix for step (2) in the image processing pipeline.
+
+        Define the dimension of self.imgDisplay, which is the terminal image to be displayed in the GUI
         '''
 
-        # The scale factors
-        scale_x = self.zoom
-        scale_y = self.zoom
+        # Working here ***
+
+        base_scale = float(self.display_height) / self.img_height
+
+        # Working here ***
+
+        scale_x = base_scale * self.zoom
+        scale_y = base_scale * self.zoom
 
         # The translation distance
         #     = half of the difference between
         #         the screen size and the zoomed image size
 
-        #    ( (     screen size     ) - (     zoomed image size     ) ) / 2
-        tx = ( (self.screen_width / 2) - (self.img_width  * self.zoom) ) / 2
-        ty = ( (self.screen_height   ) - (self.img_height * self.zoom) ) / 2
+        #    ( (     display size     ) - (     zoomed image size   ) ) / 2
+        tx = ( (self.display_width / 2) - (self.img_width  * scale_x) ) / 2
+        ty = ( (self.display_height   ) - (self.img_height * scale_y) ) / 2
 
         self.resize_matrix = np.float32([ [scale_x, 0      , tx] ,
                                           [0      , scale_y, ty] ])
+
+        self.imgDisplay = np.zeros( (self.display_height, self.display_width, 3), np.uint8 )
 
     def run(self):
         '''
@@ -349,11 +396,14 @@ class VideoThread(threading.Thread):
         (2) Resize and translate to place each image at the center of both sides of the view.
         (3) Combine images.
         '''
-        while not self.isStop:
+        while not self.stopping:
 
-            if self.isPause:
+            if self.pausing:
+                self.isPaused = True
                 time.sleep(0.1)
                 continue
+            else:
+                self.isPaused = False
 
             self.imgR_0, self.imgL_0 = self.cams.read() # The suffix '_0' means raw input image
 
@@ -378,7 +428,7 @@ class VideoThread(threading.Thread):
                 self.imgL_1 = np.copy(self.imgL_0)
 
             # Compute stereo depth map (optional)
-            if self.isComputingDepth:
+            if self.computingDepth:
                 # Convert to gray scale
                 self.imgR_gray = cv2.cvtColor(self.imgR_1, cv2.COLOR_BGR2GRAY)
                 self.imgL_gray = cv2.cvtColor(self.imgL_1, cv2.COLOR_BGR2GRAY)
@@ -393,26 +443,29 @@ class VideoThread(threading.Thread):
 
             # (2)
             # Resize and translate to place each image at the center of both sides of the view.
-            rows, cols = self.screen_height, self.screen_width / 2 # Output image dimension
+            rows, cols = self.display_height, self.display_width / 2 # Output image dimension
 
             self.imgR_2 = cv2.warpAffine(self.imgR_1, self.resize_matrix, (cols, rows))
             self.imgL_2 = cv2.warpAffine(self.imgL_1, self.resize_matrix, (cols, rows))
 
             # (3)
             # Combine images.
-            h, w = self.screen_height, self.screen_width
-            self.imgC[:, 0:(w/2), :] = self.imgL_2
-            self.imgC[:, (w/2):w, :] = self.imgR_2
+            h, w = self.display_height, self.display_width
+            self.imgDisplay[:, 0:(w/2), :] = self.imgL_2
+            self.imgDisplay[:, (w/2):w, :] = self.imgR_2
 
-            if self.isRecording:
-                self.writer.write(self.imgC)
+            if self.recording:
+                self.writer.write(self.imgDisplay)
 
             self.mediator.emit_signal( signal_name = 'display_image',
-                                       arg = self.imgC )
+                                       arg = self.imgDisplay )
             self.emit_fps_info()
 
         # Close camera hardware when the image-capturing main loop is done.
         self.cams.close()
+
+        # Disconnect signals from the gui object when the thread is done
+        self.__init__signals(connect=False)
 
     def emit_fps_info(self):
         '''
@@ -437,21 +490,63 @@ class VideoThread(threading.Thread):
         print 'offset_x = ' + str(self.offset_x) + '\n' \
               'offset_y = ' + str(self.offset_y)
 
+    def auto_offset(self, setting_x_offset):
+        '''
+        1) Read right and left images from the cameras.
+        2) Use correlation function to calculate the offset.
+        3) Set the offset parameters of the self object.
+        '''
+
+        imgR, imgL = self.cams.read()
+
+        imgR = cv2.cvtColor(imgR, cv2.COLOR_BGR2GRAY)
+        imgL = cv2.cvtColor(imgL, cv2.COLOR_BGR2GRAY)
+
+        if not imgR.shape == imgL.shape:
+            return
+
+        # Define ROI of the left image
+        row, col = imgL.shape
+        a = int(row*0.25)
+        b = int(row*0.75)
+        c = int(col*0.25)
+        d = int(col*0.75)
+        roiL = np.float32( imgL[a:b, c:d] )
+
+        mat = cv2.matchTemplate(image  = np.float32(imgR)   ,
+                                templ  = roiL               ,
+                                method = cv2.TM_CCORR_NORMED)
+
+        # Vertical alignment, should always be done
+        y_max = cv2.minMaxLoc(mat)[3][1]
+        offset_y = y_max - row / 4
+
+        # Horizontal alignment, for infinitely far objects
+        x_max = cv2.minMaxLoc(mat)[3][0]
+        offset_x = x_max - col / 4
+
+        if not setting_x_offset:
+            offset_x = self.offset_x
+
+        if not offset_x == self.offset_x or \
+            not offset_y == self.offset_y:
+            self.set_offset(offset_x, offset_y)
+
     def toggle_recording(self):
-        if not self.isRecording:
+        if not self.recording:
             # Define the codec, which is platform specific and can be hard to find
             # Set fourcc = -1 so that can select from the available codec
             fourcc = -1
             # Create VideoWriter object at 30fps
-            w, h = self.screen_width, self.screen_height
+            w, h = self.display_width, self.display_height
             self.writer = cv2.VideoWriter( 'Windu Vision.avi', fourcc, 30.0, (w, h) )
-            self.isRecording = True
+            self.recording = True
 
             # Change the icon of the gui button
             self.mediator.emit_signal('recording_starts')
 
         else:
-            self.isRecording = False
+            self.recording = False
             self.writer.release()
 
             # Change the icon of the gui button
@@ -468,21 +563,27 @@ class VideoThread(threading.Thread):
             self.set_resize_matrix()
 
     def pause(self):
-        self.isPause = True
+        self.pausing = True
+        while not self.isPaused:
+            time.sleep(0.1)
+        return
 
     def resume(self):
-        self.isPause = False
+        self.pausing = False
+        while self.isPaused:
+            time.sleep(0.1)
+        return
 
     def stop(self):
         'Called to terminate the video thread.'
 
         # Stop recording
-        if self.isRecording:
-            self.isRecording = False
+        if self.recording:
+            self.recording = False
             self.writer.release()
 
         # Shut off main loop in self.run()
-        self.isStop = True
+        self.stopping = True
 
     def apply_depth_parameters(self, parameters):
 
@@ -494,6 +595,18 @@ class VideoThread(threading.Thread):
         if self.cams:
             self.cams.apply_camera_parameters(parameters)
 
+    def set_display_size(self, width, height):
+        self.pause()
+
+        self.display_width, self.display_height = width, height
+        self.set_resize_matrix()
+
+        self.resume()
+
+    def get_raw_images(self):
+        imgR, imgL = self.cams.read()
+        return imgR, imgL
+
 
 
 class DualCamera(object):
@@ -504,11 +617,11 @@ class DualCamera(object):
     If not successfully instantiated, then the VideoCapture object is None.
     '''
     def __init__(self):
-        self.camR_id = 1
-        self.camL_id = 2
 
-        self.camR = cv2.VideoCapture(self.camR_id)
-        self.camL = cv2.VideoCapture(self.camL_id)
+        self.__init__parameters()
+
+        self.camR = cv2.VideoCapture(self.parm_vals['camR_id'])
+        self.camL = cv2.VideoCapture(self.parm_vals['camL_id'])
 
         if not self.camR.isOpened():
             self.camR = None
@@ -516,13 +629,18 @@ class DualCamera(object):
         if not self.camL.isOpened():
             self.camL = None
 
-        self.__init__parameters()
         self.__init__config()
 
         self.imgR_blank = cv2.imread('images/blankR.tif')
         self.imgL_blank = cv2.imread('images/blankL.tif')
 
     def __init__parameters(self):
+        '''
+        Load camera parameters from the /parameters/cam.json file
+        '''
+
+        fh = open('parameters/cam.json', 'r')
+        self.parm_vals = json.loads(fh.read())
 
         self.parm_ids = {'width'        : 3   ,
                          'height'       : 4   ,
@@ -534,17 +652,6 @@ class DualCamera(object):
                          'exposure'     : 15  ,
                          'white_balance': 17  ,
                          'focus'        : 28  }
-
-        self.parm_vals = {'width'        : 640 ,
-                          'height'       : 480 ,
-                          'brightness'   : 150 ,
-                          'contrast'     : 64  ,
-                          'saturation'   : 80  ,
-                          'hue'          : 13  ,
-                          'gain'         : 50  ,
-                          'exposure'     : -3  ,
-                          'white_balance': 4000,
-                          'focus'        : 0   }
 
     def __init__config(self):
 
@@ -586,6 +693,98 @@ class DualCamera(object):
         for cam in cams:
             if not cam is None:
                 cam.release()
+
+
+
+class AlignThread(threading.Thread):
+    '''
+    This thread runs concurrently with the VideoThread,
+    dynamically checking if the stereo pair of images are aligned.
+    '''
+    def __init__(self, video_thread_obj):
+        super(AlignThread, self).__init__()
+
+        self.video_thread = video_thread_obj
+
+        self.stopping = False
+
+    def run(self):
+
+        while not self.stopping:
+
+            self.video_thread.auto_offset(setting_x_offset=False)
+            # Note that the x_offset is not changed
+            # Frequently changing the x_offset could cause visual discomfort
+
+            # Check alignment every ~1 second
+            time.sleep(1)
+
+    def stop(self):
+        '''
+        Called to terminate the thread.
+        '''
+
+        # Shut off main loop in self.run()
+        self.stopping = True
+
+
+
+class CamSelectThread(threading.Thread):
+    def __init__(self, mediator_obj):
+        super(CamSelectThread, self).__init__()
+
+        self.mediator = mediator_obj
+
+        self.__init__parameters()
+
+        self.__init__signals()
+
+    def __init__parameters(self):
+        self.current_id = 0
+        self.isDone = False
+
+    def __init__signals(self, connect=True):
+        '''
+        Call the mediator to connect signals to the gui.
+        These are the signals to be emitted dynamically during runtime.
+
+        Each signal is defined by a unique str signal name.
+
+        The parameter 'connect' specifies whether connect or disconnect signals.
+        '''
+        signal_names = ['show_current_cam', 'select_cam_done']
+
+        if connect:
+            self.mediator.connect_signals(signal_names)
+        else:
+            self.mediator.disconnect_signals(signal_names)
+
+    def run(self):
+        for id in range(10):
+
+            self.isWaiting = True
+
+            self.cam = cv2.VideoCapture(id)
+
+            if self.cam.isOpened():
+                _, img = self.cam.read()
+
+                data = {'id': id, 'img': img}
+
+                self.mediator.emit_signal( signal_name = 'show_current_cam',
+                                                   arg = data)
+                while self.isWaiting:
+                    time.sleep(0.1)
+
+            else:
+                print 'Camera id: {} not available'.format(id)
+
+            self.cam.release()
+
+        self.mediator.emit_signal( signal_name = 'select_cam_done' )
+
+        # Disconnect signals from the gui object when the thread is done
+        self.__init__signals(connect=False)
 
 
 

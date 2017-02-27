@@ -32,6 +32,17 @@ class Mediator(QtCore.QThread):
             for signal in signal_names:
                 self.gui.connect_signals( thread=self, signal_name=signal )
 
+    def disconnect_signals(self, signal_names):
+        '''
+        Pass signal names to the disconnect_signals() method in the gui object.
+        '''
+        if isinstance(signal_names, str):
+            self.gui.disconnect_signals( thread=self, signal_name=signal_names )
+
+        elif isinstance(signal_names, list):
+            for signal in signal_names:
+                self.gui.disconnect_signals( thread=self, signal_name=signal )
+
     def emit_signal(self, signal_name, arg=None):
         # The suffix '(PyQt_PyObject)' means the argument to be transferred
         # could be any type of python objects,

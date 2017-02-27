@@ -1,5 +1,5 @@
 import numpy as np
-import cv2, time, sys, threading
+import cv2, time, sys, threading, os,json
 from PyQt4 import QtCore, QtGui, QtOpenGL
 from OpenGL import GL
 from WinduController import *
@@ -11,21 +11,29 @@ class WinduGUI(QtGui.QMainWindow):
         super(WinduGUI, self).__init__()
         self.controller = controller_obj
 
+        self.__init__gui_parameters()
+
         self.setWindowTitle('Windu Vision')
         self.setWindowIcon(QtGui.QIcon('icons/windu_vision.png'))
-        self.setGeometry(100, 100, 1136, 640)
-        self.setFixedSize(1136, 640)
+        self.setGeometry(100, 100, self.default_width, self.default_height)
+        self.setFixedSize(self.default_width, self.default_height)
         self.setMouseTracking(True)
 
         self.monitor = QtGui.QLabel(self)
-        self.monitor.setGeometry(0, 0, 1136, 640)
+        self.monitor.setGeometry(0, 0, self.default_width, self.default_height)
         self.monitor.setAlignment(QtCore.Qt.AlignCenter)
 
         self.toolbar = QtGui.QToolBar('Tool Bar')
-        self.toolbar.setMovable(True)
-        self.toolbar.setStyleSheet("QToolBar { background:white; }")
-        self.toolbar.setIconSize(QtCore.QSize(30, 45))
-        self.addToolBar(QtCore.Qt.LeftToolBarArea, self.toolbar)
+        self.toolbar_dev = QtGui.QToolBar('Developer Tool Bar')
+
+        for t in [self.toolbar, self.toolbar_dev]:
+            t.setMovable(True)
+            t.setStyleSheet("QToolBar { background:white; }")
+            t.setIconSize(QtCore.QSize(30, 45))
+            self.addToolBar(QtCore.Qt.LeftToolBarArea, t)
+
+        if not self.isDeveloper:
+            self.toolbar_dev.hide()
 
         self.info_window = TextWindow()
         self.progress_bar = ProgressBar()
@@ -34,54 +42,90 @@ class WinduGUI(QtGui.QMainWindow):
         self.camera_tuner_window = CameraTunerWindow( controller_obj = self.controller )
 
         self.__init__toolbtns()
+        self.__init__key_shortcut()
+
+    def __init__gui_parameters(self):
+        '''
+        Load gui parameters from the /parameters/gui.json file
+        '''
+
+        fh = open('parameters/gui.json', 'r')
+        gui_parameters = json.loads(fh.read())
+
+        for name, value in gui_parameters.items():
+            setattr(self, name, value)
 
     def __init__toolbtns(self):
         # Each action has a unique key and a name
         # key = icon filename = method name
         # name = text of the action/button
 
-        #    (    keys           ,   names               )
-        K = [('snapshot'         , 'Snapshot'                      ),
-             ('toggle_recording' , 'Record Video'                  ),
-             ('auto_offset'      , 'Auto Offset'                   ),
-             ('open_info'        , 'Show Real-time Info'           ),
-             ('open_gl_window'   , 'Open 3D Viewer'                ),
-             ('toggle_depth_map' , 'Show Depth Map'                ),
-             ('open_depth_tuner' , 'Adjust Stereo Depth Parameters'),
-             ('open_camera_tuner', 'Adjust Camera Parameters'      )]
+        #    (    keys           ,   names                         , for_developer , connect_to_core )
+        K = [('snapshot'         , 'Snapshot'                      ,    False      ,      True       ),
+             ('toggle_recording' , 'Record Video'                  ,    False      ,      True       ),
+             ('auto_offset'      , 'Auto Offset'                   ,    False      ,      True       ),
+             ('open_info'        , 'Show Real-time Info'           ,    True       ,      False      ),
+             ('open_gl_window'   , 'Open 3D Viewer'                ,    True       ,      False      ),
+             ('toggle_depth_map' , 'Show Depth Map'                ,    True       ,      True       ),
+             ('open_depth_tuner' , 'Adjust Stereo Depth Parameters',    True       ,      False      ),
+             ('start_select_cam' , 'Select Cameras'                ,    False      ,      True       ),
+             ('open_camera_tuner', 'Adjust Camera Parameters'      ,    False      ,      False      ),
+             ('toggle_fullscreen', 'Show Fullscreen'               ,    False      ,      False      )]
 
         self.actions = {}
         self.toolbtns = {}
 
-        # Create actions and tool buttons
-        for key, name in K:
+        for (key, name, for_developer, connect_to_core) in K:
+
+            # Create icon
             icon = QtGui.QIcon('icons/' + key + '.png')
+
+            # Create action
             self.actions[key] = QtGui.QAction(icon, name, self)
-            self.toolbtns[key] = self.toolbar.addAction(self.actions[key])
 
-        # For actions that needs to be connected to the core object,
-        K = ['snapshot', 'toggle_recording', 'auto_offset', 'toggle_depth_map']
+            # Add action to toolbar depending it's for developer or not
+            if for_developer:
+                self.toolbtns[key] = self.toolbar_dev.addAction(self.actions[key])
+            else:
+                self.toolbtns[key] = self.toolbar.addAction(self.actions[key])
 
-        # In this loop I defined a standard way of
-        # connecting each action to a method in the core object via the controller object.
-        for key in K:
-            # Get a argument-less method from the controller object.
-            # Note that the method_name = key.
-            method = self.controller.get_method( method_name = key )
-            # The get_method() returns None
-            # if a particular method is not found in the core object.
+
+
+            if connect_to_core:
+                # For actions that needs to be connected to the core object,
+                # I defined a standard way of getting a argument-less method from the controller object.
+                # Note that the method_name = key.
+                method = self.controller.get_method( method_name = key )
+                # The get_method() returns None if a particular method is not found in the core object.
+                if not method is None:
+                    # Connect the action to the method in the controller object
+                    self.actions[key].triggered.connect(method)
+
+            else:
+                # For actions that needs to be connected to the self gui object
+                try:
+                    method = getattr(self, key)
+                    self.actions[key].triggered.connect(method)
+                except Exception as exception_inst:
+                    print exception_inst
+
+    def __init__key_shortcut(self):
+        QtGui.QShortcut(QtGui.QKeySequence('Ctrl+F'), self, self.toggle_fullscreen)
+        QtGui.QShortcut(QtGui.QKeySequence('Shift+Ctrl+D'), self, self.toggle_developer)
+        QtGui.QShortcut(QtGui.QKeySequence('Esc'), self, self.esc_key)
+
+        # For key combinations that need to be connected to the core object
+        #    ( method_name      , key combination )
+        K = [('snapshot'        , 'Ctrl+S'        ),
+             ('toggle_recording', 'Ctrl+R'        ),
+             ('auto_offset'     , 'Ctrl+A'        )]
+
+        for method_name, key_comb in K:
+            method = self.controller.get_method(method_name)
             if not method is None:
-                # Connect the action to the method in the controller object
-                self.actions[key].triggered.connect(method)
+                QtGui.QShortcut(QtGui.QKeySequence(key_comb), self, method)
 
-        # For actions that needs to be connected to the self gui object,
-        keys = ['open_info', 'open_gl_window', 'open_depth_tuner', 'open_camera_tuner']
-        for key in keys:
-            try:
-                method = getattr(self, key)
-                self.actions[key].triggered.connect(method)
-            except Exception as exception_inst:
-                print exception_inst
+    # Methods called by actions of the self GUI object
 
     def open_info(self):
         if not self.info_window.isVisible():
@@ -96,6 +140,40 @@ class WinduGUI(QtGui.QMainWindow):
 
     def open_camera_tuner(self):
         self.camera_tuner_window.show()
+
+    def toggle_fullscreen(self):
+        if self.isFullScreen():
+            self.showNormal()
+            self.toolbar.show()
+
+        else:
+            self.showFullScreen()
+            self.toolbar.hide()
+
+        w, h = self.width(), self.height()
+        self.monitor.setGeometry(0, 0, w, h)
+
+        self.controller.call_method( method_name = 'set_display_size', arg = (w, h))
+
+    def toggle_developer(self):
+        if self.isDeveloper:
+            self.toolbar_dev.hide()
+            self.isDeveloper = False
+        else:
+            self.toolbar_dev.show()
+            self.isDeveloper = True
+
+    def esc_key(self):
+        if self.isFullScreen():
+            self.showNormal()
+            self.toolbar.show()
+
+            w, h = self.width(), self.height()
+            self.monitor.setGeometry(0, 0, w, h)
+
+            self.controller.call_method( method_name = 'set_display_size', arg = (w, h))
+
+    # Overriden methods
 
     def wheelEvent(self, event):
         if event.delta() > 0:
@@ -120,22 +198,48 @@ class WinduGUI(QtGui.QMainWindow):
         else:
             event.ignore()
 
+    def keyPressEvent (self, eventQKeyEvent):
+        key = eventQKeyEvent.key()
+        if key == QtCore.Qt.Key_Up:
+            self.controller.call_method('zoom_in')
+        elif key == QtCore.Qt.Key_Down:
+            self.controller.call_method('zoom_out')
+
     # Methods for incoming signals
 
     def connect_signals(self, thread, signal_name):
-        'Called by an external object to connect signals.'
+        '''
+        Called by an external object to connect signals.
+        '''
 
         # The suffix '(PyQt_PyObject)' means the argument to be transferred
         # could be any type of python objects,
         # not limited to Qt objects.
         signal = signal_name + '(PyQt_PyObject)'
 
-        # The method name to be called upon signal arrival = the signal name
+        # The method name to be called = the signal name
         try:
             method = getattr(self, signal_name)
             self.connect(thread, QtCore.SIGNAL(signal), method)
+
         except Exception as exception_inst:
             print "Try to connect PyQt signal '{}'".format(signal_name)
+            print exception_inst + '\n'
+
+    def disconnect_signals(self, thread, signal_name):
+        '''
+        Called by an external object to disconnect signals.
+        This does exactly the opposite of self.connect_signals()
+        '''
+
+        signal = signal_name + '(PyQt_PyObject)'
+
+        try:
+            method = getattr(self, signal_name)
+            self.disconnect(thread, QtCore.SIGNAL(signal), method)
+
+        except Exception as exception_inst:
+            print "Try to disconnect PyQt signal '{}'".format(signal_name)
             print exception_inst + '\n'
 
     def progress_update(self, text_value):
@@ -172,6 +276,72 @@ class WinduGUI(QtGui.QMainWindow):
 
     def display_topography(self, vertices):
         self.gl_window.gl_widget.updateObject(vertices)
+
+    def show_current_cam(self, data):
+
+        id = data['id']
+        image = data['img']
+
+        rows, cols, _ = image.shape
+
+        widget = QtGui.QWidget()
+        widget.setWindowTitle('Windu Vision')
+        widget.setWindowIcon(QtGui.QIcon('icons/windu_vision.png'))
+        widget.setFixedSize(cols, rows)
+
+        canvas = QtGui.QLabel(widget)
+        canvas.setGeometry(0, 0, cols, rows)
+
+        widget.show()
+
+        # convert from BGR to RGB for latter QImage
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+
+        height, width, bytesPerComponent = image.shape
+        bytesPerLine = bytesPerComponent * width
+
+        # convert cv2 image to QImage
+        Q_img = QtGui.QImage(image,
+                             width, height, bytesPerLine,
+                             QtGui.QImage.Format_RGB888)
+
+        # Convert QImage to QPixmap
+        Q_pixmap = QtGui.QPixmap.fromImage(Q_img)
+
+        # Set the QLabel to display the QPixmap
+        canvas.setPixmap(Q_pixmap)
+
+        which_side = self.specify_right_left_cam()
+
+        data = {'id': id, 'which_side': which_side}
+
+        widget.close()
+
+        self.controller.call_method( method_name = 'save_cam_id', arg = data )
+        self.controller.call_method( method_name = 'next_cam')
+
+    def specify_right_left_cam(self):
+
+        m = QtGui.QMessageBox()
+        m.setWindowIcon(QtGui.QIcon('icons/windu_vision.png'))
+        m.setWindowTitle('Windu Vision')
+        m.setIcon(QtGui.QMessageBox.Question)
+        m.setText('Is this the right or left camera?')
+        m.addButton(QtGui.QPushButton('Left'), QtGui.QMessageBox.YesRole)
+        m.addButton(QtGui.QPushButton('Right'), QtGui.QMessageBox.NoRole)
+        m.addButton(QtGui.QPushButton('None'), QtGui.QMessageBox.RejectRole)
+
+        reply = m.exec_()
+
+        if reply == 0:
+            return 'L'
+        elif reply == 1:
+            return 'R'
+        else:
+            return None
+
+    def select_cam_done(self):
+        self.controller.call_method(method_name = 'start_video_thread')
 
 
 
@@ -405,13 +575,16 @@ class CameraTunerWindow(TunerWindow):
 
         self.setMinimumWidth(600)
 
-        self.add_parameter(name='brightness'    , min=0   , max=255 , value=150 , interval=5  )
-        self.add_parameter(name='contrast'      , min=0   , max=255 , value=64  , interval=5  )
-        self.add_parameter(name='saturation'    , min=0   , max=255 , value=80  , interval=5  )
-        self.add_parameter(name='gain'          , min=0   , max=255 , value=50  , interval=5  )
-        self.add_parameter(name='exposure'      , min=-7  , max=-1  , value=-4  , interval=1  )
-        self.add_parameter(name='white_balance' , min=3000, max=6500, value=5000, interval=100)
-        self.add_parameter(name='focus'         , min=0   , max=255 , value=0   , interval=5  )
+        fh = open('parameters/cam.json', 'r')
+        parms = json.loads(fh.read())
+
+        self.add_parameter(name='brightness'    , min=0   , max=255 , value=parms['brightness']   , interval=5  )
+        self.add_parameter(name='contrast'      , min=0   , max=255 , value=parms['contrast']     , interval=5  )
+        self.add_parameter(name='saturation'    , min=0   , max=255 , value=parms['saturation']   , interval=5  )
+        self.add_parameter(name='gain'          , min=0   , max=255 , value=parms['gain']         , interval=5  )
+        self.add_parameter(name='exposure'      , min=-7  , max=-1  , value=parms['exposure']     , interval=1  )
+        self.add_parameter(name='white_balance' , min=3000, max=6500, value=parms['white_balance'], interval=100)
+        self.add_parameter(name='focus'         , min=0   , max=255 , value=parms['focus']        , interval=5  )
 
     def apply_parameter(self):
         '''
