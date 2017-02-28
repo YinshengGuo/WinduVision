@@ -330,15 +330,23 @@ class VideoThread(threading.Thread):
     def __init__parms(self):
         # Parameters for image processing
         self.offset_x, self.offset_y = 0, 0
-        self.set_offset_matrix()
         self.img_height, self.img_width, _ = self.cams.read()[0].shape
         self.zoom = 1.0
-        self.display_width, self.display_height = 1136, 640
+
+        fh = open('parameters/gui.json', 'r')
+        gui_parms = json.loads(fh.read())
+        self.display_width = gui_parms['default_width']
+        self.display_height = gui_parms['default_height']
+
         self.set_resize_matrix()
+
+
 
         # Parameters for stereo depth map
         self.ndisparities = 32 # Must be divisible by 16
         self.SADWindowSize = 31 # Must be odd, be within 5..255 and be not larger than image width or height
+
+
 
         # Parameters for looping, control and timing
         self.recording = False
@@ -349,40 +357,51 @@ class VideoThread(threading.Thread):
         self.t_0 = time.time()
         self.t_1 = time.time()
 
-    def set_offset_matrix(self):
-        '''
-        Define the matrix for step (1) in the image processing pipeline.
-        '''
-        self.offset_matrix = np.float32([ [1, 0, self.offset_x] ,
-                                          [0, 1, self.offset_y] ])
-
     def set_resize_matrix(self):
         '''
-        Define the matrix for step (2) in the image processing pipeline.
-
-        Define the dimension of self.imgDisplay, which is the terminal image to be displayed in the GUI
+        Define the transformation matrix for the image processing pipeline.
+        Also define the dimension of self.imgDisplay, which is the terminal image to be displayed in the GUI.
         '''
 
-        # Working here ***
 
+        # The base scale factor is the ratio of display height / image height,
+        #     which scales the image to the size of the display.
+        # Because height is the limiting dimension, so it's height but not width.
         base_scale = float(self.display_height) / self.img_height
 
-        # Working here ***
-
+        # The actual scale factor is the product of the base scale factor and the zoom factor.
         scale_x = base_scale * self.zoom
         scale_y = base_scale * self.zoom
 
-        # The translation distance
+
+
+        # The translation distance for centering
         #     = half of the difference between
         #         the screen size and the zoomed image size
-
         #    ( (     display size     ) - (     zoomed image size   ) ) / 2
         tx = ( (self.display_width / 2) - (self.img_width  * scale_x) ) / 2
         ty = ( (self.display_height   ) - (self.img_height * scale_y) ) / 2
 
-        self.resize_matrix = np.float32([ [scale_x, 0      , tx] ,
-                                          [0      , scale_y, ty] ])
 
+
+        # Putting everything together into a matrix
+        Sx = scale_x
+        Sy = scale_y
+
+        Off_x = self.offset_x
+        Off_y = self.offset_y
+
+        # For the right image, it's only scaling and centering
+        self.resize_matrix_R = np.float32([ [Sx, 0 , tx] ,
+                                            [0 , Sy, ty] ])
+
+        # For the left image, in addition to scaling and centering, the offset is also applied.
+        self.resize_matrix_L = np.float32([ [Sx, 0 , Sx*Off_x + tx] ,
+                                            [0 , Sy, Sy*Off_y + ty] ])
+
+
+
+        # Define self.imgDisplay, which is the image to be emitted to the GUI object.
         self.imgDisplay = np.zeros( (self.display_height, self.display_width, 3), np.uint8 )
 
     def run(self):
@@ -391,13 +410,14 @@ class VideoThread(threading.Thread):
         with some additional steps in between.
 
         ( ) Check image dimensions.
-        (1) Eliminate offset of the raw input image.
-        ( ) Compute depth map (optional).
+        (1) Eliminate offset of the left image.
         (2) Resize and translate to place each image at the center of both sides of the view.
+        ( ) Compute depth map (optional).
         (3) Combine images.
         '''
         while not self.stopping:
 
+            # Pausing the loop (or not)
             if self.pausing:
                 self.isPaused = True
                 time.sleep(0.1)
@@ -405,67 +425,72 @@ class VideoThread(threading.Thread):
             else:
                 self.isPaused = False
 
+
+
+            # Read the images from the cameras
             self.imgR_0, self.imgL_0 = self.cams.read() # The suffix '_0' means raw input image
 
+            # Quick check on the image dimensions
+            # If not matching, skip and continue
             if not self.imgR_0.shape == self.imgL_0.shape:
                 self.mediator.emit_signal( signal_name = 'set_info_text',
                                            arg = 'Image dimensions not identical.' )
                 time.sleep(0.1)
                 continue
 
-            # (1)
-            # Eliminate offset of the raw input image.
-            # That is, translate the left to match the right
-            if self.offset_x != 0 or self.offset_y != 0:
 
-                rows, cols, _ = self.imgL_0.shape # Output image dimension
 
-                self.imgR_1 = np.copy(self.imgR_0)
-                self.imgL_1 = cv2.warpAffine(self.imgL_0, self.offset_matrix, (cols, rows))
+            # (1) Eliminate offset of the left image.
+            # (2) Resize and translate to place each image at the center of both sides of the view.
+            rows, cols = self.display_height, self.display_width / 2 # Output image dimension
 
-            else:
-                self.imgR_1 = np.copy(self.imgR_0)
-                self.imgL_1 = np.copy(self.imgL_0)
+            self.imgR_1 = cv2.warpAffine(self.imgR_0, self.resize_matrix_R, (cols, rows))
+            self.imgL_1 = cv2.warpAffine(self.imgL_0, self.resize_matrix_L, (cols, rows))
+
+
 
             # Compute stereo depth map (optional)
             if self.computingDepth:
-                # Convert to gray scale
-                self.imgR_gray = cv2.cvtColor(self.imgR_1, cv2.COLOR_BGR2GRAY)
-                self.imgL_gray = cv2.cvtColor(self.imgL_1, cv2.COLOR_BGR2GRAY)
+                self.imgL_1 = self.compute_depth(self.imgR_1, self.imgL_1)
 
-                # Compute stereo disparity
-                stereo = cv2.StereoBM(cv2.STEREO_BM_BASIC_PRESET, self.ndisparities, self.SADWindowSize)
-                D = stereo.compute(self.imgL_gray, self.imgR_gray).astype(np.float)
-                depth_map = ( D - np.min(D) ) / ( np.max(D) - np.min(D) ) * 255
 
-                for color in xrange(3):
-                    self.imgL_1[:, :, color] = depth_map.astype(np.uint8)
 
-            # (2)
-            # Resize and translate to place each image at the center of both sides of the view.
-            rows, cols = self.display_height, self.display_width / 2 # Output image dimension
-
-            self.imgR_2 = cv2.warpAffine(self.imgR_1, self.resize_matrix, (cols, rows))
-            self.imgL_2 = cv2.warpAffine(self.imgL_1, self.resize_matrix, (cols, rows))
-
-            # (3)
-            # Combine images.
+            # (3) Combine images.
             h, w = self.display_height, self.display_width
-            self.imgDisplay[:, 0:(w/2), :] = self.imgL_2
-            self.imgDisplay[:, (w/2):w, :] = self.imgR_2
-
-            if self.recording:
-                self.writer.write(self.imgDisplay)
+            self.imgDisplay[:, 0:(w/2), :] = self.imgL_1
+            self.imgDisplay[:, (w/2):w, :] = self.imgR_1
 
             self.mediator.emit_signal( signal_name = 'display_image',
                                        arg = self.imgDisplay )
+
             self.emit_fps_info()
+
+
+
+            # Record video
+            if self.recording:
+                self.writer.write(self.imgDisplay)
 
         # Close camera hardware when the image-capturing main loop is done.
         self.cams.close()
 
         # Disconnect signals from the gui object when the thread is done
         self.__init__signals(connect=False)
+
+    def compute_depth(self, imgR, imgL):
+        # Convert to gray scale
+        imgR_ = cv2.cvtColor(imgR, cv2.COLOR_BGR2GRAY)
+        imgL_ = cv2.cvtColor(imgL, cv2.COLOR_BGR2GRAY)
+
+        # Compute stereo disparity
+        stereo = cv2.StereoBM(cv2.STEREO_BM_BASIC_PRESET, self.ndisparities, self.SADWindowSize)
+        D = stereo.compute(imgL_, imgR_).astype(np.float)
+        depth_map = ( D - np.min(D) ) / ( np.max(D) - np.min(D) ) * 255
+
+        for ch in xrange(3):
+            imgL[:, :, ch] = depth_map.astype(np.uint8)
+
+        return imgL
 
     def emit_fps_info(self):
         '''
@@ -485,7 +510,7 @@ class VideoThread(threading.Thread):
 
     def set_offset(self, offset_x, offset_y):
         self.offset_x, self.offset_y = offset_x, offset_y
-        self.set_offset_matrix()
+        self.set_resize_matrix()
 
         print 'offset_x = ' + str(self.offset_x) + '\n' \
               'offset_y = ' + str(self.offset_y)
