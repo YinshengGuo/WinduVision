@@ -512,14 +512,27 @@ class VideoThread(threading.Thread):
         self.offset_x, self.offset_y = offset_x, offset_y
         self.set_resize_matrix()
 
-        print 'offset_x = ' + str(self.offset_x) + '\n' \
-              'offset_y = ' + str(self.offset_y)
+        print 'offset_x = {}, offset_y = {} \n'.format(str(self.offset_x), str(self.offset_y))
 
     def auto_offset(self, setting_x_offset):
         '''
+        1) Detect offset.
+        3) Set the offset parameters of the self object.
+        '''
+
+        offset_x, offset_y = self.detect_offset()
+        # offset_y: Vertical alignment, should always be done
+        # offset_x: Horizontal alignment, for infinitely far objects
+
+        if not setting_x_offset:
+            offset_x = self.offset_x
+
+        self.set_offset(offset_x, offset_y)
+
+    def detect_offset(self):
+        '''
         1) Read right and left images from the cameras.
         2) Use correlation function to calculate the offset.
-        3) Set the offset parameters of the self object.
         '''
 
         imgR, imgL = self.cams.read()
@@ -550,12 +563,7 @@ class VideoThread(threading.Thread):
         x_max = cv2.minMaxLoc(mat)[3][0]
         offset_x = x_max - col / 4
 
-        if not setting_x_offset:
-            offset_x = self.offset_x
-
-        if not offset_x == self.offset_x or \
-            not offset_y == self.offset_y:
-            self.set_offset(offset_x, offset_y)
+        return offset_x, offset_y
 
     def toggle_recording(self):
         if not self.recording:
@@ -735,14 +743,40 @@ class AlignThread(threading.Thread):
 
     def run(self):
 
+        # Get the initial values of offset
+        x, y = self.video_thread.detect_offset()
+
+        # Construct a queue of offset values
+        X = np.array([x for i in xrange(10)], np.float)
+        Y = np.array([y for i in xrange(10)], np.float)
+
         while not self.stopping:
 
-            self.video_thread.auto_offset(setting_x_offset=False)
-            # Note that the x_offset is not changed
-            # Frequently changing the x_offset could cause visual discomfort
+            # Shift by one
+            X[1:] = X[:-1]
+            Y[1:] = Y[:-1]
 
-            # Check alignment every ~1 second
-            time.sleep(1)
+            # Get the current offset value into the queue
+            X[0], Y[0] = self.video_thread.detect_offset()
+
+            # Sort the list of offset values
+            # Remove the lowest and the highest one (outliers)
+            # Average
+            x_avg = np.average(np.sort(X)[1:-1])
+            y_avg = np.average(np.sort(Y)[1:-1])
+
+            # Set the offset value, which effectly moves the left image
+            self.video_thread.set_offset(x_avg, y_avg)
+
+            # If the current offset value differs significantly from the average,
+            #     meaning that there is more "active movements",
+            # then speed up the loop to get back to a stable condition as soon as possible.
+            if abs(Y[0] - y_avg) > 1:
+                time.sleep(0.01)
+            else:
+                # Under stable condition, in which the current offset doesn't differ from the average,
+                # Check alignment every ~1 second.
+                time.sleep(1)
 
     def stop(self):
         '''

@@ -1,5 +1,26 @@
 '''
---- This is version 6.2 ---
+--- This is version 6.3 ---
+
+    Major changes has been done in the AlignThread class,
+    to resolve the problem of "jumping" image when there is a active and quick movement under the microscope.
+
+    This jumping problem is possibly caused by asynchronous imaging of the two cameras, and
+    can be considered as an outlier of alignment offset.
+
+    Approaches to resolve the jumpiness:
+
+        (1) Construct a queue of the past 10 offset values.
+            Sort them, take out the highest and the lowest values.
+            Average the median values.
+
+        (2) Use the averaged values to set image offset.
+
+        (3) If the current offset value differs significantly from the average, meaning that there is more "active movements",
+            then speed up the loop to get back to a stable condition as soon as possible.
+
+
+
+--- Version 6.2 ---
 
     Restructured the image processing pipeline in the video_thread object, with a few major points:
 
@@ -13,6 +34,8 @@
         (2) Factor out the depth computation into a separate method.
 
             Depth computation is done on the scaled images.
+
+
 
 --- Version 6.1 ---
 

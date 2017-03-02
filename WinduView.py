@@ -193,6 +193,7 @@ class WinduGUI(QtGui.QMainWindow):
             self.progress_bar.close()
             self.gl_window.close()
             self.depth_tuner_window.close()
+            self.camera_tuner_window.close()
             event.accept()
 
         else:
@@ -571,7 +572,7 @@ class CameraTunerWindow(TunerWindow):
         self.controller = controller_obj
 
         self.setWindowIcon(QtGui.QIcon('icons/windu_vision.png'))
-        self.setWindowTitle('Stereo Depth Parameters')
+        self.setWindowTitle('Camera Parameters')
 
         self.setMinimumWidth(600)
 
