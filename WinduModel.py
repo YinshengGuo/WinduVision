@@ -51,7 +51,7 @@ class WinduCore(object):
         '''
         Some high-level commands to be executed upon the software is initiated
         '''
-        self.auto_offset()
+        pass
 
     def start_video_thread(self):
         # Pass the mediator into the video thread,
@@ -60,7 +60,8 @@ class WinduCore(object):
         self.video_thread.start()
 
         # The self.align_thread is dependent on self.video_thread
-        self.align_thread = AlignThread(video_thread_obj = self.video_thread)
+        self.align_thread = AlignThread(video_thread_obj = self.video_thread,
+                                            mediator_obj = self.mediator)
         self.align_thread.start()
 
     def stop_video_thread(self):
@@ -86,8 +87,8 @@ class WinduCore(object):
         if self.video_thread:
             self.video_thread.toggle_recording()
 
-    def auto_offset(self):
-        self.video_thread.auto_offset(setting_x_offset=True)
+    def toggle_auto_offset(self):
+        self.align_thread.toggle()
 
     def zoom_in(self):
         if self.video_thread:
@@ -514,21 +515,6 @@ class VideoThread(threading.Thread):
 
         print 'offset_x = {}, offset_y = {} \n'.format(str(self.offset_x), str(self.offset_y))
 
-    def auto_offset(self, setting_x_offset):
-        '''
-        1) Detect offset.
-        3) Set the offset parameters of the self object.
-        '''
-
-        offset_x, offset_y = self.detect_offset()
-        # offset_y: Vertical alignment, should always be done
-        # offset_x: Horizontal alignment, for infinitely far objects
-
-        if not setting_x_offset:
-            offset_x = self.offset_x
-
-        self.set_offset(offset_x, offset_y)
-
     def detect_offset(self):
         '''
         1) Read right and left images from the cameras.
@@ -734,23 +720,49 @@ class AlignThread(threading.Thread):
     This thread runs concurrently with the VideoThread,
     dynamically checking if the stereo pair of images are aligned.
     '''
-    def __init__(self, video_thread_obj):
+    def __init__(self, video_thread_obj, mediator_obj):
         super(AlignThread, self).__init__()
 
         self.video_thread = video_thread_obj
+        self.mediator = mediator_obj
+
+        self.__init__signals()
 
         self.stopping = False
+        self.pausing = True
+        self.isPaused = True
+
+    def __init__signals(self, connect=True):
+        '''
+        Call the mediator to connect signals to the gui.
+        These are the signals to be emitted dynamically during runtime.
+
+        Each signal is defined by a unique str signal name.
+
+        The parameter 'connect' specifies whether connect or disconnect signals.
+        '''
+        signal_names = ['auto_offset_resumed', 'auto_offset_paused']
+
+        if connect:
+            self.mediator.connect_signals(signal_names)
+        else:
+            self.mediator.disconnect_signals(signal_names)
 
     def run(self):
 
-        # Get the initial values of offset
-        x, y = self.video_thread.detect_offset()
-
         # Construct a queue of offset values
-        X = np.array([x for i in xrange(10)], np.float)
-        Y = np.array([y for i in xrange(10)], np.float)
+        X = np.zeros((10, ), np.float)
+        Y = np.zeros((10, ), np.float)
 
         while not self.stopping:
+
+            # Pausing the loop (or not)
+            if self.pausing:
+                self.isPaused = True
+                time.sleep(0.1)
+                continue
+            else:
+                self.isPaused = False
 
             # Shift by one
             X[1:] = X[:-1]
@@ -777,6 +789,21 @@ class AlignThread(threading.Thread):
                 # Under stable condition, in which the current offset doesn't differ from the average,
                 # Check alignment every ~1 second.
                 time.sleep(1)
+
+
+
+        # Disconnect signals from the gui object when the thread is done
+        self.__init__signals(connect=False)
+
+    def toggle(self):
+
+        if self.pausing: # If it's paused, resume
+            self.pausing = False
+            self.mediator.emit_signal(signal_name = 'auto_offset_resumed')
+
+        else: # If it's not paused, pause
+            self.pausing = True
+            self.mediator.emit_signal(signal_name = 'auto_offset_paused')
 
     def stop(self):
         '''
@@ -847,37 +874,9 @@ class CamSelectThread(threading.Thread):
 
 
 
-class CmdThread(threading.Thread):
-    def __init__(self, core_obj):
-        super(CmdThread, self).__init__()
-        self.core = core_obj
-
-    def run(self):
-        while True:
-            pass
-            # Methods in the core object can be directly called
-            # method_name = raw_input('Execute method in the core object: ')
-            # if method_name == 'quit':
-            #     print '\nCommand input quit.'
-            #     break
-            # try:
-            #     method = getattr(self.core, method_name)
-            #     method()
-            # except Exception as exception_inst:
-            #     print exception_inst
-
-            # self.core.video_thread.ndisparities = int(raw_input('ndisparities: '))
-            # self.core.video_thread.SADWindowSize = int(raw_input('SADWindowSize: '))
-
-
-
 if __name__ == '__main__':
     app = QtGui.QApplication(sys.argv)
     core = WinduCore()
-
-    cmd_thread = CmdThread(core_obj = core)
-    # cmd_thread.start()
-
     sys.exit(app.exec_())
 
 

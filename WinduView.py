@@ -60,17 +60,17 @@ class WinduGUI(QtGui.QMainWindow):
         # key = icon filename = method name
         # name = text of the action/button
 
-        #    (    keys           ,   names                         , for_developer , connect_to_core )
-        K = [('snapshot'         , 'Snapshot'                      ,    False      ,      True       ),
-             ('toggle_recording' , 'Record Video'                  ,    False      ,      True       ),
-             ('auto_offset'      , 'Auto Offset'                   ,    False      ,      True       ),
-             ('open_info'        , 'Show Real-time Info'           ,    True       ,      False      ),
-             ('open_gl_window'   , 'Open 3D Viewer'                ,    True       ,      False      ),
-             ('toggle_depth_map' , 'Show Depth Map'                ,    True       ,      True       ),
-             ('open_depth_tuner' , 'Adjust Stereo Depth Parameters',    True       ,      False      ),
-             ('start_select_cam' , 'Select Cameras'                ,    False      ,      True       ),
-             ('open_camera_tuner', 'Adjust Camera Parameters'      ,    False      ,      False      ),
-             ('toggle_fullscreen', 'Show Fullscreen'               ,    False      ,      False      )]
+        #    (    keys               ,   names                         , for_developer , connect_to_core )
+        K = [('snapshot'             , 'Snapshot'                      ,    False      ,      True       ),
+             ('toggle_recording'     , 'Record Video'                  ,    False      ,      True       ),
+             ('toggle_auto_offset'   , 'Start Auto-alignment'        ,    False      ,      True       ),
+             ('open_info'            , 'Show Real-time Info'           ,    True       ,      False      ),
+             ('open_gl_window'       , 'Open 3D Viewer'                ,    True       ,      False      ),
+             ('toggle_depth_map'     , 'Show Depth Map'                ,    True       ,      True       ),
+             ('open_depth_tuner'     , 'Adjust Stereo Depth Parameters',    True       ,      False      ),
+             ('start_select_cam'     , 'Select Cameras'                ,    False      ,      True       ),
+             ('open_camera_tuner'    , 'Adjust Camera Parameters'      ,    False      ,      False      ),
+             ('toggle_fullscreen'    , 'Show Fullscreen'               ,    False      ,      False      )]
 
         self.actions = {}
         self.toolbtns = {}
@@ -115,10 +115,10 @@ class WinduGUI(QtGui.QMainWindow):
         QtGui.QShortcut(QtGui.QKeySequence('Esc'), self, self.esc_key)
 
         # For key combinations that need to be connected to the core object
-        #    ( method_name      , key combination )
-        K = [('snapshot'        , 'Ctrl+S'        ),
-             ('toggle_recording', 'Ctrl+R'        ),
-             ('auto_offset'     , 'Ctrl+A'        )]
+        #    ( method_name         , key combination )
+        K = [('snapshot'           , 'Ctrl+S'        ),
+             ('toggle_recording'   , 'Ctrl+R'        ),
+             ('toggle_auto_offset' , 'Ctrl+A'        )]
 
         for method_name, key_comb in K:
             method = self.controller.get_method(method_name)
@@ -225,7 +225,7 @@ class WinduGUI(QtGui.QMainWindow):
 
         except Exception as exception_inst:
             print "Try to connect PyQt signal '{}'".format(signal_name)
-            print exception_inst + '\n'
+            print str(exception_inst) + '\n'
 
     def disconnect_signals(self, thread, signal_name):
         '''
@@ -271,6 +271,14 @@ class WinduGUI(QtGui.QMainWindow):
     def recording_ends(self):
         self.actions['toggle_recording'].setIcon(QtGui.QIcon('icons/toggle_recording.png'))
         self.actions['toggle_recording'].setText('Record Video')
+
+    def auto_offset_resumed(self):
+        self.actions['toggle_auto_offset'].setIcon(QtGui.QIcon('icons/pause_auto_offset.png'))
+        self.actions['toggle_auto_offset'].setText('Stop Auto-alignment')
+
+    def auto_offset_paused(self):
+        self.actions['toggle_auto_offset'].setIcon(QtGui.QIcon('icons/toggle_auto_offset.png'))
+        self.actions['toggle_auto_offset'].setText('Start Auto-alignment')
 
     def set_info_text(self, text):
         self.info_window.setText(text)

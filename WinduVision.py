@@ -1,5 +1,20 @@
 '''
---- This is version 6.3 ---
+--- This is version 6.4 ---
+
+    Abandone the auto_offset() method, which aligns the left image to the right image for only one shot.
+
+    For GUI control, replace the auto_offset() method with toggle_auto_offset().
+    This toggling method pauses/resumes the loop in the AlignThread.
+    Therefore users can turn ON or OFF the continuous alignment function.
+
+    The main loop in the AlignThread was modified for pausing/resuming.
+
+    The GUI icons for the toggle_auto_offset() method was also changed.
+    Users can see the status, either ON or OFF, of auto offset.
+
+
+
+--- Version 6.3 ---
 
     Major changes has been done in the AlignThread class,
     to resolve the problem of "jumping" image when there is a active and quick movement under the microscope.
