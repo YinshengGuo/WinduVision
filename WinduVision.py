@@ -1,5 +1,34 @@
 '''
---- This is version 6.4 ---
+--- This is version 7.0 ---
+
+    Major change from 6.4 to 7.0:
+        Split one set of camera parameters into two sets for right and left cameras, respective.
+        This entails an extensive change of code strucutures and interfaces.
+        Conceptually, everything involving camera parameters (get, set, read, write) is duplicated.
+        The GUI window for setting camera parameters is also duplicated.
+
+    Here I list the most notable changes:
+
+    (1) Data structure of the 'cam.json' file, i.e. the camera parameters:
+        {'R': {dictionary of parameters}, 'L': {dictionary of parameters}}
+
+    (2) Extensive changes in the CameraTunerWindow class to account for right or left.
+
+    (3) Instantiate two camera tuner windows, for R and L, respectively, in the main WinduGUI object.
+        Related methods like open_camera_tuner() is also modified.
+
+    (4) The data transferred from a CameraTunerWindow object to the WinduCore object is changed to the structure of
+        {'isRightCam': True/False, 'parameters': {dictionary of parameters}}.
+
+    (5) Changes in the apply_camera_parameters() methods in WinduCore, VideoThread classes.
+
+    (6) Extensive changes in the DualCamera class.
+        DualCamera class is a low-leveled class that directly operates camera hardwares (VideoCapture objects).
+        The two VideoCapture objects are configured separately.
+
+
+
+--- Version 6.4 ---
 
     Abandone the auto_offset() method, which aligns the left image to the right image for only one shot.
 

@@ -39,7 +39,8 @@ class WinduGUI(QtGui.QMainWindow):
         self.progress_bar = ProgressBar()
         self.gl_window = GLWindow( controller_obj = self.controller )
         self.depth_tuner_window = DepthTunerWindow( controller_obj = self.controller )
-        self.camera_tuner_window = CameraTunerWindow( controller_obj = self.controller )
+        self.camera_tuner_window_R = CameraTunerWindow( controller_obj = self.controller, isRightCam=True )
+        self.camera_tuner_window_L = CameraTunerWindow( controller_obj = self.controller, isRightCam=False )
 
         self.__init__toolbtns()
         self.__init__key_shortcut()
@@ -139,7 +140,11 @@ class WinduGUI(QtGui.QMainWindow):
         self.depth_tuner_window.show()
 
     def open_camera_tuner(self):
-        self.camera_tuner_window.show()
+        self.camera_tuner_window_L.move(200, 200)
+        self.camera_tuner_window_R.move(300, 300)
+
+        self.camera_tuner_window_L.show()
+        self.camera_tuner_window_R.show()
 
     def toggle_fullscreen(self):
         if self.isFullScreen():
@@ -189,11 +194,17 @@ class WinduGUI(QtGui.QMainWindow):
 
         if reply == QtGui.QMessageBox.Yes:
             self.controller.call_method('close')
-            self.info_window.close()
-            self.progress_bar.close()
-            self.gl_window.close()
-            self.depth_tuner_window.close()
-            self.camera_tuner_window.close()
+
+            window_list = [self.info_window          ,
+                           self.progress_bar         ,
+                           self.gl_window            ,
+                           self.depth_tuner_window   ,
+                           self.camera_tuner_window_R,
+                           self.camera_tuner_window_L]
+
+            for win in window_list:
+                win.close()
+
             event.accept()
 
         else:
@@ -574,26 +585,32 @@ class CameraTunerWindow(TunerWindow):
     This class also manages the transfer of camera parameters
     to the core object.
     '''
-    def __init__(self, controller_obj):
+    def __init__(self, controller_obj, isRightCam):
         super(CameraTunerWindow, self).__init__()
 
         self.controller = controller_obj
+        self.isRightCam = isRightCam
 
         self.setWindowIcon(QtGui.QIcon('icons/windu_vision.png'))
-        self.setWindowTitle('Camera Parameters')
-
         self.setMinimumWidth(600)
 
-        fh = open('parameters/cam.json', 'r')
-        parms = json.loads(fh.read())
+        with open('parameters/cam.json', 'r') as fh:
+            parms = json.loads(fh.read())
 
-        self.add_parameter(name='brightness'    , min=0   , max=255 , value=parms['brightness']   , interval=5  )
-        self.add_parameter(name='contrast'      , min=0   , max=255 , value=parms['contrast']     , interval=5  )
-        self.add_parameter(name='saturation'    , min=0   , max=255 , value=parms['saturation']   , interval=5  )
-        self.add_parameter(name='gain'          , min=0   , max=255 , value=parms['gain']         , interval=5  )
-        self.add_parameter(name='exposure'      , min=-7  , max=-1  , value=parms['exposure']     , interval=1  )
-        self.add_parameter(name='white_balance' , min=3000, max=6500, value=parms['white_balance'], interval=100)
-        self.add_parameter(name='focus'         , min=0   , max=255 , value=parms['focus']        , interval=5  )
+        if isRightCam:
+            val = parms['R']
+            self.setWindowTitle('Right Camera Parameters')
+        else:
+            val = parms['L']
+            self.setWindowTitle('Left Camera Parameters')
+
+        self.add_parameter(name='brightness'    , min=0   , max=255 , value=val['brightness']   , interval=5  )
+        self.add_parameter(name='contrast'      , min=0   , max=255 , value=val['contrast']     , interval=5  )
+        self.add_parameter(name='saturation'    , min=0   , max=255 , value=val['saturation']   , interval=5  )
+        self.add_parameter(name='gain'          , min=0   , max=255 , value=val['gain']         , interval=5  )
+        self.add_parameter(name='exposure'      , min=-7  , max=-1  , value=val['exposure']     , interval=1  )
+        self.add_parameter(name='white_balance' , min=3000, max=6500, value=val['white_balance'], interval=100)
+        self.add_parameter(name='focus'         , min=0   , max=255 , value=val['focus']        , interval=5  )
 
     def apply_parameter(self):
         '''
@@ -603,8 +620,10 @@ class CameraTunerWindow(TunerWindow):
         for p in self.parameters:
             parms[p.name] = p.value
 
+        data = {'isRightCam': self.isRightCam, 'parameters': parms}
+
         self.controller.call_method( method_name = 'apply_camera_parameters',
-                                             arg = parms                   )
+                                             arg = data                     )
 
 
 

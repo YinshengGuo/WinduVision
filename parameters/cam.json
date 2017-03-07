@@ -1,1 +1,1 @@
-{"camR_id": 4, "hue": 13, "saturation": 110, "brightness": 100, "focus": 0, "height": 480, "width": 640, "camL_id": 3, "white_balance": 4000, "gain": 60, "contrast": 50, "exposure": -4}
+{"R": {"hue": 13, "saturation": 125, "brightness": 45, "focus": 0, "height": 480, "width": 640, "white_balance": 5100, "gain": 100, "id": 0, "contrast": 125, "exposure": -4}, "L": {"hue": 13, "saturation": 110, "brightness": 120, "focus": 0, "height": 480, "width": 640, "white_balance": 4100, "gain": 135, "id": 1, "contrast": 125, "exposure": -6}}

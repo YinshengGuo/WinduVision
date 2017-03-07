@@ -244,18 +244,27 @@ class WinduCore(object):
         if self.video_thread:
             self.video_thread.apply_depth_parameters(parameters)
 
-    def apply_camera_parameters(self, parameters):
+    def apply_camera_parameters(self, data):
+
+        isRightCam = data['isRightCam']
+        parameters = data['parameters']
 
         if self.video_thread:
-            self.video_thread.apply_camera_parameters(parameters)
+            self.video_thread.apply_camera_parameters(isRightCam, parameters)
 
-        fh = open('parameters/cam.json', 'r')
-        saved_parameters = json.loads(fh.read())
+        with open('parameters/cam.json', 'r') as fh:
+            saved_parameters = json.loads(fh.read())
 
-        for key in parameters:
-            saved_parameters[key] = parameters[key]
+        if isRightCam:
+            side = 'R'
+        else:
+            side = 'L'
 
-        json.dump(saved_parameters, open('parameters/cam.json', 'w'))
+        for name in parameters.keys():
+            saved_parameters[side][name] = parameters[name]
+
+        with open('parameters/cam.json', 'w') as fh:
+            json.dump(saved_parameters, fh)
 
     def toggle_depth_map(self):
         self.video_thread.computingDepth = not self.video_thread.computingDepth
@@ -278,17 +287,18 @@ class WinduCore(object):
         id = data['id']
         which_side = data['which_side']
 
-        fh = open('parameters/cam.json', 'r')
-        parm_vals = json.loads(fh.read())
+        with open('parameters/cam.json', 'r') as fh:
+            parm_vals = json.loads(fh.read())
 
-        if which_side == 'L':
-            parm_vals['camL_id'] = id
-        elif which_side == 'R':
-            parm_vals['camR_id'] = id
+        if which_side == 'R':
+            parm_vals['R']['id'] = id
+        elif which_side == 'L':
+            parm_vals['L']['id'] = id
         else:
             return
 
-        json.dump(parm_vals, open('parameters/cam.json', 'w'))
+        with open('parameters/cam.json', 'w') as fh:
+            json.dump(parm_vals, fh)
 
     def next_cam(self):
         self.cam_select_thread.isWaiting = False
@@ -609,10 +619,10 @@ class VideoThread(threading.Thread):
         for key, value in parameters.items():
             setattr(self, key, value)
 
-    def apply_camera_parameters(self, parameters):
+    def apply_camera_parameters(self, isRightCam, parameters):
 
         if self.cams:
-            self.cams.apply_camera_parameters(parameters)
+            self.cams.set_parameters(isRightCam, parameters)
 
     def set_display_size(self, width, height):
         self.pause()
@@ -639,8 +649,8 @@ class DualCamera(object):
 
         self.__init__parameters()
 
-        self.camR = cv2.VideoCapture(self.parm_vals['camR_id'])
-        self.camL = cv2.VideoCapture(self.parm_vals['camL_id'])
+        self.camR = cv2.VideoCapture(self.parm_vals['R']['id'])
+        self.camL = cv2.VideoCapture(self.parm_vals['L']['id'])
 
         if not self.camR.isOpened():
             self.camR = None
@@ -658,8 +668,10 @@ class DualCamera(object):
         Load camera parameters from the /parameters/cam.json file
         '''
 
-        fh = open('parameters/cam.json', 'r')
-        self.parm_vals = json.loads(fh.read())
+        with open('parameters/cam.json', 'r') as fh:
+            self.parm_vals = json.loads(fh.read())
+            # data structure of self.parm_vals:
+            # {'R': {dictionary of parameters}, 'L': {dictionary of parameters}}
 
         self.parm_ids = {'width'        : 3   ,
                          'height'       : 4   ,
@@ -674,10 +686,17 @@ class DualCamera(object):
 
     def __init__config(self):
 
-        for cam in (self.camR, self.camL):
-            if not cam is None:
-                for key in self.parm_ids:
-                    cam.set( self.parm_ids[key], self.parm_vals[key] )
+        ids = self.parm_ids # dictionary
+        vals = self.parm_vals # dictionary
+        names = self.parm_ids.keys() # list
+
+        if not self.camR is None:
+            for name in names:
+                self.camR.set( ids[name], vals['R'][name] )
+
+        if not self.camL is None:
+            for name in names:
+                self.camL.set( ids[name], vals['L'][name] )
 
     def read(self):
         '''Return the properly rotated image. If cv2_cam is None than return a blank image.'''
@@ -700,10 +719,15 @@ class DualCamera(object):
 
         return (self.imgR, self.imgL)
 
-    def apply_camera_parameters(self, parameters):
+    def set_parameters(self, isRightCam, parameters):
 
-        for key, value in parameters.items():
-            self.parm_vals[key] = value
+        if isRightCam:
+            side = 'R'
+        else:
+            side = 'L'
+
+        for name, value in parameters.items():
+            self.parm_vals[side][name] = value
 
         self.__init__config()
 
