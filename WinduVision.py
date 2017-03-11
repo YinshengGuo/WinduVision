@@ -1,5 +1,21 @@
 '''
---- This is version 7.1 ---
+--- This is version 7.2 ---
+
+    Refactor and unify the interface of camera parameters:
+
+    (1) Replace isRightCam=True/False with side='L'/'R'.
+
+    (2) Writing of the file cam.json is placed in DualCam object,
+        so that the cam.json file is always bound to the current status of the camera.
+
+    (3) Always get/set parameters of only one camera at a time.
+
+    (4) Modify the CameraTunerWindow class and its parent classes, so that
+        each time the window is opened, camera parameters is loaded from the cam.json file.
+
+
+
+--- Version 7.1 ---
 
     Introduced automatic camera tuning.
 

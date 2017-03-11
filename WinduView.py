@@ -39,8 +39,8 @@ class WinduGUI(QtGui.QMainWindow):
         self.progress_bar = ProgressBar()
         self.gl_window = GLWindow( controller_obj = self.controller )
         self.depth_tuner_window = DepthTunerWindow( controller_obj = self.controller )
-        self.camera_tuner_window_R = CameraTunerWindow( controller_obj = self.controller, isRightCam=True )
-        self.camera_tuner_window_L = CameraTunerWindow( controller_obj = self.controller, isRightCam=False )
+        self.camera_tuner_window_R = CameraTunerWindow( controller_obj = self.controller, side='R' )
+        self.camera_tuner_window_L = CameraTunerWindow( controller_obj = self.controller, side='L' )
 
         self.__init__toolbtns()
         self.__init__key_shortcut()
@@ -141,11 +141,16 @@ class WinduGUI(QtGui.QMainWindow):
         self.depth_tuner_window.show()
 
     def open_camera_tuner(self):
-        self.camera_tuner_window_L.move(200, 200)
-        self.camera_tuner_window_R.move(300, 300)
+        L, R = self.camera_tuner_window_L, self.camera_tuner_window_R
 
-        self.camera_tuner_window_L.show()
-        self.camera_tuner_window_R.show()
+        L.move(200, 200)
+        R.move(300, 300)
+
+        L.update_parameter()
+        R.update_parameter()
+
+        L.show()
+        R.show()
 
     def toggle_fullscreen(self):
         if self.isFullScreen():
@@ -364,6 +369,17 @@ class WinduGUI(QtGui.QMainWindow):
     def select_cam_done(self):
         self.controller.call_method(method_name = 'start_video_thread')
 
+    def cam_equal_done(self):
+
+        m = QtGui.QMessageBox()
+        m.setWindowIcon(QtGui.QIcon('icons/windu_vision.png'))
+        m.setWindowTitle('Windu Vision')
+        # m.setIcon(QtGui.QMessageBox.Question)
+        m.setText('Camera equalized')
+        m.addButton(QtGui.QPushButton('OK'), QtGui.QMessageBox.YesRole)
+
+        m.exec_()
+
 
 
 class TextWindow(QtGui.QWidget):
@@ -538,6 +554,13 @@ class TunerWindow(QtGui.QWidget):
 
         self.main_vbox.insertWidget(len(self.main_vbox)-1, widget)
 
+    def set_parameter(self, name, value):
+
+        # Iterate over all widgets to search for the widget that has the matched name
+        for widget in self.parameters:
+            if widget.name == name:
+                widget.setValue(value)
+
 
 
 class DepthTunerWindow(TunerWindow):
@@ -586,24 +609,24 @@ class CameraTunerWindow(TunerWindow):
     This class also manages the transfer of camera parameters
     to the core object.
     '''
-    def __init__(self, controller_obj, isRightCam):
+    def __init__(self, controller_obj, side):
         super(CameraTunerWindow, self).__init__()
 
         self.controller = controller_obj
-        self.isRightCam = isRightCam
+        self.side = side
 
         self.setWindowIcon(QtGui.QIcon('icons/windu_vision.png'))
         self.setMinimumWidth(600)
 
+        if self.side == 'R':
+            self.setWindowTitle('Right Camera Parameters')
+        else:
+            self.setWindowTitle('Left Camera Parameters')
+
         with open('parameters/cam.json', 'r') as fh:
             parms = json.loads(fh.read())
 
-        if isRightCam:
-            val = parms['R']
-            self.setWindowTitle('Right Camera Parameters')
-        else:
-            val = parms['L']
-            self.setWindowTitle('Left Camera Parameters')
+        val = parms[self.side]
 
         self.add_parameter(name='brightness'    , min=0   , max=255 , value=val['brightness']   , interval=5  )
         self.add_parameter(name='contrast'      , min=0   , max=255 , value=val['contrast']     , interval=5  )
@@ -621,10 +644,20 @@ class CameraTunerWindow(TunerWindow):
         for p in self.parameters:
             parms[p.name] = p.value
 
-        data = {'isRightCam': self.isRightCam, 'parameters': parms}
+        data = {'side': self.side, 'parameters': parms}
 
         self.controller.call_method( method_name = 'apply_camera_parameters',
                                              arg = data                     )
+
+    def update_parameter(self):
+
+        with open('parameters/cam.json', 'r') as fh:
+            parameters = json.loads(fh.read())
+
+        parms = parameters[self.side]
+
+        for name, value in parms.items():
+            self.set_parameter(name, value)
 
 
 

@@ -8,6 +8,9 @@ from WinduController import *
 
 class WinduCore(object):
     def __init__(self):
+
+        super(WinduCore, self).__init__()
+
         # Instantiate a controller object.
         # Pass the core object into the controller object,
         # so the controller can call the core.
@@ -246,25 +249,11 @@ class WinduCore(object):
 
     def apply_camera_parameters(self, data):
 
-        isRightCam = data['isRightCam']
+        side = data['side']
         parameters = data['parameters']
 
         if self.video_thread:
-            self.video_thread.apply_camera_parameters(isRightCam, parameters)
-
-        with open('parameters/cam.json', 'r') as fh:
-            saved_parameters = json.loads(fh.read())
-
-        if isRightCam:
-            side = 'R'
-        else:
-            side = 'L'
-
-        for name in parameters.keys():
-            saved_parameters[side][name] = parameters[name]
-
-        with open('parameters/cam.json', 'w') as fh:
-            json.dump(saved_parameters, fh)
+            self.video_thread.set_camera_parameters(side, parameters)
 
     def toggle_depth_map(self):
         self.video_thread.computingDepth = not self.video_thread.computingDepth
@@ -629,25 +618,25 @@ class VideoThread(threading.Thread):
         for key, value in parameters.items():
             setattr(self, key, value)
 
-    def apply_camera_parameters(self, isRightCam, parameters):
+    def set_camera_parameters(self, side, parameters):
 
         if self.cams:
-            self.cams.set_parameters(isRightCam, parameters)
+            self.cams.set_parameters(side, parameters)
 
-    def get_camera_parameters(self):
-
-        if self.cams:
-            return self.cams.get_parameters()
-
-    def set_one_cam_parm(self, isRightCam, name, value):
+    def get_camera_parameters(self, side):
 
         if self.cams:
-            self.cams.set_one_parm(isRightCam, name, value)
+            return self.cams.get_parameters(side)
 
-    def get_one_cam_parm(self, isRightCam, name):
+    def set_one_cam_parm(self, side, name, value):
 
         if self.cams:
-            return self.cams.get_one_parm(isRightCam, name)
+            self.cams.set_one_parm(side, name, value)
+
+    def get_one_cam_parm(self, side, name):
+
+        if self.cams:
+            return self.cams.get_one_parm(side, name)
 
     def set_display_size(self, width, height):
         self.pause()
@@ -671,6 +660,8 @@ class DualCamera(object):
     If not successfully instantiated, then the VideoCapture object is None.
     '''
     def __init__(self):
+
+        super(DualCamera, self).__init__()
 
         self.__init__parameters()
 
@@ -718,7 +709,6 @@ class DualCamera(object):
         if not self.camR is None:
             for name in names:
                 self.camR.set( ids[name], vals['R'][name] )
-                print name
 
         if not self.camL is None:
             for name in names:
@@ -745,39 +735,41 @@ class DualCamera(object):
 
         return (self.imgR, self.imgL)
 
-    def set_parameters(self, isRightCam, parameters):
-
-        if isRightCam:
-            side = 'R'
-        else:
-            side = 'L'
+    def set_parameters(self, side, parameters):
 
         for name, value in parameters.items():
             self.parm_vals[side][name] = value
 
+        with open('parameters/cam.json', 'r') as fh:
+            saved_parameters = json.loads(fh.read())
+
+        for name in parameters.keys():
+            saved_parameters[side][name] = parameters[name]
+
+        with open('parameters/cam.json', 'w') as fh:
+            json.dump(saved_parameters, fh)
+
         self.__init__config()
 
-    def get_parameters(self):
+    def get_parameters(self, side):
 
-        return self.parm_vals
+        return self.parm_vals[side]
 
-    def set_one_parm(self, isRightCam, name, value):
-
-        if isRightCam:
-            side = 'R'
-        else:
-            side = 'L'
+    def set_one_parm(self, side, name, value):
 
         self.parm_vals[side][name] = value
 
+        with open('parameters/cam.json', 'r') as fh:
+            saved_parameters = json.loads(fh.read())
+
+        saved_parameters[side][name] = value
+
+        with open('parameters/cam.json', 'w') as fh:
+            json.dump(saved_parameters, fh)
+
         self.__init__config()
 
-    def get_one_parm(self, isRightCam, name):
-
-        if isRightCam:
-            side = 'R'
-        else:
-            side = 'L'
+    def get_one_parm(self, side, name):
 
         return self.parm_vals[side][name]
 
@@ -913,7 +905,7 @@ class CamEqualThread(threading.Thread):
 
         The parameter 'connect' specifies whether connect or disconnect signals.
         '''
-        signal_names = ['signal']
+        signal_names = ['cam_equal_done']
 
         if connect:
             self.mediator.connect_signals(signal_names)
@@ -928,7 +920,7 @@ class CamEqualThread(threading.Thread):
         for i in xrange(100):
 
             # Get the current gain value of the left camera
-            gain = self.video_thread.get_one_cam_parm(isRightCam=False, name='gain')
+            gain = self.video_thread.get_one_cam_parm(side='L', name='gain')
 
             imgR, imgL = self.video_thread.get_raw_images()
 
@@ -948,7 +940,11 @@ class CamEqualThread(threading.Thread):
             else:
                 break
 
-            self.video_thread.set_one_cam_parm(isRightCam=False, name='gain', value=gain)
+            self.video_thread.set_one_cam_parm(side='L', name='gain', value=gain)
+
+        self.mediator.emit_signal( signal_name = 'cam_equal_done' )
+
+        self.__init__signals(connect=False)
 
     def get_roi(self, img):
 
