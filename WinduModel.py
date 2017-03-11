@@ -303,6 +303,16 @@ class WinduCore(object):
     def next_cam(self):
         self.cam_select_thread.isWaiting = False
 
+    def equalize_cameras(self):
+        '''
+        Instantiate a thread object to equalize cameras.
+        After the work is done, the thread object is no longer in use.
+        '''
+
+        cam_equal_thread = CamEqualThread(video_thread_obj = self.video_thread,
+                                                   mediator_obj = self.mediator)
+        cam_equal_thread.start()
+
 
 
 class VideoThread(threading.Thread):
@@ -624,6 +634,21 @@ class VideoThread(threading.Thread):
         if self.cams:
             self.cams.set_parameters(isRightCam, parameters)
 
+    def get_camera_parameters(self):
+
+        if self.cams:
+            return self.cams.get_parameters()
+
+    def set_one_cam_parm(self, isRightCam, name, value):
+
+        if self.cams:
+            self.cams.set_one_parm(isRightCam, name, value)
+
+    def get_one_cam_parm(self, isRightCam, name):
+
+        if self.cams:
+            return self.cams.get_one_parm(isRightCam, name)
+
     def set_display_size(self, width, height):
         self.pause()
 
@@ -693,6 +718,7 @@ class DualCamera(object):
         if not self.camR is None:
             for name in names:
                 self.camR.set( ids[name], vals['R'][name] )
+                print name
 
         if not self.camL is None:
             for name in names:
@@ -730,6 +756,30 @@ class DualCamera(object):
             self.parm_vals[side][name] = value
 
         self.__init__config()
+
+    def get_parameters(self):
+
+        return self.parm_vals
+
+    def set_one_parm(self, isRightCam, name, value):
+
+        if isRightCam:
+            side = 'R'
+        else:
+            side = 'L'
+
+        self.parm_vals[side][name] = value
+
+        self.__init__config()
+
+    def get_one_parm(self, isRightCam, name):
+
+        if isRightCam:
+            side = 'R'
+        else:
+            side = 'L'
+
+        return self.parm_vals[side][name]
 
     def close(self):
         cams = [self.camR, self. camL]
@@ -836,6 +886,80 @@ class AlignThread(threading.Thread):
 
         # Shut off main loop in self.run()
         self.stopping = True
+
+
+
+class CamEqualThread(threading.Thread):
+    '''
+    This thread is associated with (and dependent on) the VideoThread object.
+
+    It accesses and analyzes images from the VideoThread object,
+        and adjusts camera parameters via VideoThread object.
+    '''
+    def __init__(self, video_thread_obj, mediator_obj):
+        super(CamEqualThread, self).__init__()
+
+        self.video_thread = video_thread_obj
+        self.mediator = mediator_obj
+
+        self.__init__signals()
+
+    def __init__signals(self, connect=True):
+        '''
+        Call the mediator to connect signals to the gui.
+        These are the signals to be emitted dynamically during runtime.
+
+        Each signal is defined by a unique str signal name.
+
+        The parameter 'connect' specifies whether connect or disconnect signals.
+        '''
+        signal_names = ['signal']
+
+        if connect:
+            self.mediator.connect_signals(signal_names)
+        else:
+            self.mediator.disconnect_signals(signal_names)
+
+    def run(self):
+
+        # Adjust 'gain' of the left camera until
+        #     the average of the left image equals to the average of the right image
+        #     that is, equal brightness
+        for i in xrange(100):
+
+            # Get the current gain value of the left camera
+            gain = self.video_thread.get_one_cam_parm(isRightCam=False, name='gain')
+
+            imgR, imgL = self.video_thread.get_raw_images()
+
+            imgR = self.get_roi(imgR)
+            imgL = self.get_roi(imgL)
+
+            bright_R = np.average(imgR)
+            bright_L = np.average(imgL)
+
+            diff = bright_L - bright_R
+
+            # Dynamically adjust gain according to the difference
+            if diff > 1:
+                gain -= int(diff)
+            elif diff < -1:
+                gain -= int(diff)
+            else:
+                break
+
+            self.video_thread.set_one_cam_parm(isRightCam=False, name='gain', value=gain)
+
+    def get_roi(self, img):
+
+        rows, cols, channels = img.shape
+
+        A = rows * 1 / 4
+        B = rows * 3 / 4
+        C = cols * 1 / 4
+        D = cols * 3 / 4
+
+        return img[A:B, C:D, :]
 
 
 

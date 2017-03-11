@@ -64,13 +64,14 @@ class WinduGUI(QtGui.QMainWindow):
         #    (    keys               ,   names                         , for_developer , connect_to_core )
         K = [('snapshot'             , 'Snapshot'                      ,    False      ,      True       ),
              ('toggle_recording'     , 'Record Video'                  ,    False      ,      True       ),
-             ('toggle_auto_offset'   , 'Start Auto-alignment'        ,    False      ,      True       ),
+             ('toggle_auto_offset'   , 'Start Auto-alignment'          ,    False      ,      True       ),
              ('open_info'            , 'Show Real-time Info'           ,    True       ,      False      ),
              ('open_gl_window'       , 'Open 3D Viewer'                ,    True       ,      False      ),
              ('toggle_depth_map'     , 'Show Depth Map'                ,    True       ,      True       ),
              ('open_depth_tuner'     , 'Adjust Stereo Depth Parameters',    True       ,      False      ),
              ('start_select_cam'     , 'Select Cameras'                ,    False      ,      True       ),
              ('open_camera_tuner'    , 'Adjust Camera Parameters'      ,    False      ,      False      ),
+             ('equalize_cameras'     , 'Equalize Cameras'              ,    False      ,      True       ),
              ('toggle_fullscreen'    , 'Show Fullscreen'               ,    False      ,      False      )]
 
         self.actions = {}

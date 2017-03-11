@@ -1,5 +1,18 @@
 '''
---- This is version 7.0 ---
+--- This is version 7.1 ---
+
+    Introduced automatic camera tuning.
+
+    In this first version for camera tuning,
+        adjust left camera gain to equalize brightness levels in both images.
+
+    Create a CamEqualThread class which operates via the VideoThread object:
+        (1) Access and analyze images
+        (2) Control camera gains
+
+
+
+--- Version 7.0 ---
 
     Major change from 6.4 to 7.0:
         Split one set of camera parameters into two sets for right and left cameras, respective.
