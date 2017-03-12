@@ -1,5 +1,16 @@
 '''
---- This is version 7.4 ---
+--- This is version 7.5 ---
+
+    (1) Fix the bug of copying right camera id to the left camera id
+        in the CamEqualThread class.
+
+    (2) Change the camera gain range to 0-127.
+
+    (3) In CameraTunerWindow class change the interval of parameters.
+
+
+
+--- Version 7.4 ---
 
     (1) Copy the right camera parameter to the left camera
         before resuming the camera equalization process.

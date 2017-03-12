@@ -369,18 +369,15 @@ class WinduGUI(QtGui.QMainWindow):
     def select_cam_done(self):
         self.controller.call_method(method_name = 'start_video_thread')
 
-    def camera_equalized(self, successful):
+    def camera_equalized(self, note):
 
-        if successful:
-            text = 'Camera equalized'
-        else:
-            text = 'Camera not equalized'
+        print note
 
         m = QtGui.QMessageBox()
         m.setWindowIcon(QtGui.QIcon('icons/windu_vision.png'))
         m.setWindowTitle('Windu Vision')
         m.setIcon(QtGui.QMessageBox.Information)
-        m.setText(text)
+        m.setText('Camera equalized')
         m.addButton(QtGui.QPushButton('OK'), QtGui.QMessageBox.YesRole)
 
         m.exec_()
@@ -633,10 +630,10 @@ class CameraTunerWindow(TunerWindow):
 
         val = parms[self.side]
 
-        self.add_parameter(name='brightness'    , min=0   , max=255 , value=val['brightness']   , interval=5  )
-        self.add_parameter(name='contrast'      , min=0   , max=255 , value=val['contrast']     , interval=5  )
-        self.add_parameter(name='saturation'    , min=0   , max=255 , value=val['saturation']   , interval=5  )
-        self.add_parameter(name='gain'          , min=0   , max=255 , value=val['gain']         , interval=5  )
+        self.add_parameter(name='brightness'    , min=0   , max=255 , value=val['brightness']   , interval=1  )
+        self.add_parameter(name='contrast'      , min=0   , max=255 , value=val['contrast']     , interval=1  )
+        self.add_parameter(name='saturation'    , min=0   , max=255 , value=val['saturation']   , interval=1  )
+        self.add_parameter(name='gain'          , min=0   , max=127 , value=val['gain']         , interval=1  )
         self.add_parameter(name='exposure'      , min=-7  , max=-1  , value=val['exposure']     , interval=1  )
         self.add_parameter(name='white_balance' , min=3000, max=6500, value=val['white_balance'], interval=100)
         self.add_parameter(name='focus'         , min=0   , max=255 , value=val['focus']        , interval=5  )
