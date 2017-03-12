@@ -907,7 +907,7 @@ class CamEqualThread(threading.Thread):
     This thread is associated with (and dependent on) the VideoThread object.
 
     It accesses and analyzes images from the VideoThread object,
-        and adjusts camera parameters via VideoThread object.
+        and adjusts camera parameters via the VideoThread object.
     '''
     def __init__(self, video_thread_obj, mediator_obj):
         super(CamEqualThread, self).__init__()
@@ -920,6 +920,7 @@ class CamEqualThread(threading.Thread):
         self.stopping = False
         self.pausing = True
         self.isPaused = True
+        self.iter = 0
 
     def __init__signals(self, connect=True):
         '''
@@ -939,10 +940,9 @@ class CamEqualThread(threading.Thread):
 
     def run(self):
 
-        # Adjust 'gain' of the left camera until
-        #     the average of the left image equals to the average of the right image
-        #     that is, equal brightness
         while not self.stopping:
+
+            # --- Section of runtime control --- #
 
             # Pausing the loop (or not)
             if self.pausing:
@@ -952,16 +952,32 @@ class CamEqualThread(threading.Thread):
             else:
                 self.isPaused = False
 
+            if self.iter > 20:
+                # Number of iteration exceeded the limit,
+                #   (1) pause camera equalization, and
+                #   (2) emit signal to the gui to show camera NOT equalized
+                self.pausing = True
+                # Reset the iteration number every time when pausing
+                self.iter = 0
+                self.mediator.emit_signal(signal_name = 'camera_equalized',
+                                                  arg = False )
+            self.iter += 1
+
+
+
+            # --- Section of camera equalization --- #
+
+            # Adjust 'gain' of the left camera until
+            #     the average of the left image equals to the average of the right image
+            #     that is, equal brightness
+
             # Get the current gain value of the left camera
             gain = self.video_thread.get_one_cam_parm(side='L', name='gain')
 
             imgR, imgL = self.video_thread.get_raw_images()
 
-            imgR = self.get_roi(imgR)
-            imgL = self.get_roi(imgL)
-
-            bright_R = np.average(imgR)
-            bright_L = np.average(imgL)
+            bright_R = np.average(self.get_roi(imgR))
+            bright_L = np.average(self.get_roi(imgL))
 
             diff = bright_L - bright_R
 
@@ -971,15 +987,29 @@ class CamEqualThread(threading.Thread):
             elif diff < -1:
                 gain -= int(diff)
             else:
+                # Condition satisfied,
+                #   (1) pause camera equalization, and
+                #   (2) emit signal to the gui to show camera equalized
                 self.pausing = True
+                # Reset the iteration number every time when pausing
+                self.iter = 0
                 self.mediator.emit_signal(signal_name = 'camera_equalized',
                                                   arg = True)
 
             ret = self.video_thread.set_one_cam_parm(side='L', name='gain', value=gain)
             if not ret:
+                # If not able to set the camera, meaning that the parameter is out of range,
+                #   (1) pause camera equalization, and
+                #   (2) emit signal to the gui to show camera NOT equalized
                 self.pausing = True
+                # Reset the iteration number every time when pausing
+                self.iter = 0
                 self.mediator.emit_signal(signal_name = 'camera_equalized',
                                                   arg = False )
+
+
+
+        # --- Out of main loop, terminating the thread --- #
 
         # Disconnect signals from the gui object when the thread is done
         self.__init__signals(connect=False)
@@ -996,7 +1026,14 @@ class CamEqualThread(threading.Thread):
         return img[A:B, C:D, :]
 
     def resume(self):
-        self.pausing = False
+
+        if self.pausing:
+            # Every time when camera equalization is resumed,
+            # copy the right camera parameters to the left camera.
+            parm_R = self.video_thread.get_camera_parameters(side='R')
+            self.video_thread.set_camera_parameters(side='L', parameters=parm_R)
+
+            self.pausing = False
 
     def stop(self):
         '''

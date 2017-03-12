@@ -1,5 +1,15 @@
 '''
---- This is version 7.3 ---
+--- This is version 7.4 ---
+
+    (1) Copy the right camera parameter to the left camera
+        before resuming the camera equalization process.
+
+    (2) Fixing the problem of camera equalization not converging (infinite loop),
+        by limiting the number of iteration.
+
+
+
+--- Version 7.3 ---
 
     Change the runtime behavior of CamEqualThread.
 
