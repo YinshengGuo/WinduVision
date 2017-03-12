@@ -369,13 +369,18 @@ class WinduGUI(QtGui.QMainWindow):
     def select_cam_done(self):
         self.controller.call_method(method_name = 'start_video_thread')
 
-    def cam_equal_done(self):
+    def camera_equalized(self, successful):
+
+        if successful:
+            text = 'Camera equalized'
+        else:
+            text = 'Camera not equalized'
 
         m = QtGui.QMessageBox()
         m.setWindowIcon(QtGui.QIcon('icons/windu_vision.png'))
         m.setWindowTitle('Windu Vision')
-        # m.setIcon(QtGui.QMessageBox.Question)
-        m.setText('Camera equalized')
+        m.setIcon(QtGui.QMessageBox.Information)
+        m.setText(text)
         m.addButton(QtGui.QPushButton('OK'), QtGui.QMessageBox.YesRole)
 
         m.exec_()

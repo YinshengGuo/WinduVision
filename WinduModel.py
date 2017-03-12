@@ -32,6 +32,8 @@ class WinduCore(object):
         # Start the video thread, also concurrent threads
         self.start_video_thread()
 
+        self.EqualizingCameras = False
+
         self.__init__cmd()
 
     def __init__signals(self, connect=True):
@@ -67,11 +69,17 @@ class WinduCore(object):
                                             mediator_obj = self.mediator)
         self.align_thread.start()
 
+        # The self.cam_equal_thread is dependent on self.video_thread
+        self.cam_equal_thread = CamEqualThread(video_thread_obj = self.video_thread,
+                                                   mediator_obj = self.mediator)
+        self.cam_equal_thread.start()
+
     def stop_video_thread(self):
         # The self.align_thread depends self.video_thread,
         # so close the align_thread first
         self.align_thread.stop()
         self.video_thread.stop()
+        self.cam_equal_thread.stop()
 
     def close(self):
         'Should be called upon software termination.'
@@ -298,9 +306,7 @@ class WinduCore(object):
         After the work is done, the thread object is no longer in use.
         '''
 
-        cam_equal_thread = CamEqualThread(video_thread_obj = self.video_thread,
-                                                   mediator_obj = self.mediator)
-        cam_equal_thread.start()
+        self.cam_equal_thread.resume()
 
 
 
@@ -631,7 +637,7 @@ class VideoThread(threading.Thread):
     def set_one_cam_parm(self, side, name, value):
 
         if self.cams:
-            self.cams.set_one_parm(side, name, value)
+            return self.cams.set_one_parm(side, name, value)
 
     def get_one_cam_parm(self, side, name):
 
@@ -756,8 +762,23 @@ class DualCamera(object):
         return self.parm_vals[side]
 
     def set_one_parm(self, side, name, value):
+        #                            min   max   increment
+        limits = {'brightness'    : (0   , 255 , 1),
+                  'contrast'      : (0   , 255 , 1),
+                  'saturation'    : (0   , 255 , 1),
+                  'gain'          : (0   , 255 , 1),
+                  'exposure'      : (-7  , -1  , 1),
+                  'white_balance' : (3000, 6500, 1),
+                  'focus'         : (0   , 255 , 5)}
 
-        self.parm_vals[side][name] = value
+        min, max, increment = limits[name]
+
+        conditions = [ value < min            ,
+                       value > max            ,
+                       value % increment != 0 ]
+
+        if any(conditions):
+            return False
 
         with open('parameters/cam.json', 'r') as fh:
             saved_parameters = json.loads(fh.read())
@@ -767,7 +788,9 @@ class DualCamera(object):
         with open('parameters/cam.json', 'w') as fh:
             json.dump(saved_parameters, fh)
 
+        self.parm_vals[side][name] = value
         self.__init__config()
+        return True
 
     def get_one_parm(self, side, name):
 
@@ -856,8 +879,6 @@ class AlignThread(threading.Thread):
                 # Check alignment every ~1 second.
                 time.sleep(1)
 
-
-
         # Disconnect signals from the gui object when the thread is done
         self.__init__signals(connect=False)
 
@@ -896,6 +917,10 @@ class CamEqualThread(threading.Thread):
 
         self.__init__signals()
 
+        self.stopping = False
+        self.pausing = True
+        self.isPaused = True
+
     def __init__signals(self, connect=True):
         '''
         Call the mediator to connect signals to the gui.
@@ -905,7 +930,7 @@ class CamEqualThread(threading.Thread):
 
         The parameter 'connect' specifies whether connect or disconnect signals.
         '''
-        signal_names = ['cam_equal_done']
+        signal_names = ['camera_equalized']
 
         if connect:
             self.mediator.connect_signals(signal_names)
@@ -917,7 +942,15 @@ class CamEqualThread(threading.Thread):
         # Adjust 'gain' of the left camera until
         #     the average of the left image equals to the average of the right image
         #     that is, equal brightness
-        for i in xrange(100):
+        while not self.stopping:
+
+            # Pausing the loop (or not)
+            if self.pausing:
+                self.isPaused = True
+                time.sleep(0.1)
+                continue
+            else:
+                self.isPaused = False
 
             # Get the current gain value of the left camera
             gain = self.video_thread.get_one_cam_parm(side='L', name='gain')
@@ -938,12 +971,17 @@ class CamEqualThread(threading.Thread):
             elif diff < -1:
                 gain -= int(diff)
             else:
-                break
+                self.pausing = True
+                self.mediator.emit_signal(signal_name = 'camera_equalized',
+                                                  arg = True)
 
-            self.video_thread.set_one_cam_parm(side='L', name='gain', value=gain)
+            ret = self.video_thread.set_one_cam_parm(side='L', name='gain', value=gain)
+            if not ret:
+                self.pausing = True
+                self.mediator.emit_signal(signal_name = 'camera_equalized',
+                                                  arg = False )
 
-        self.mediator.emit_signal( signal_name = 'cam_equal_done' )
-
+        # Disconnect signals from the gui object when the thread is done
         self.__init__signals(connect=False)
 
     def get_roi(self, img):
@@ -956,6 +994,17 @@ class CamEqualThread(threading.Thread):
         D = cols * 3 / 4
 
         return img[A:B, C:D, :]
+
+    def resume(self):
+        self.pausing = False
+
+    def stop(self):
+        '''
+        Called to terminate the thread.
+        '''
+
+        # Shut off main loop in self.run()
+        self.stopping = True
 
 
 
@@ -1012,6 +1061,10 @@ class CamSelectThread(threading.Thread):
             self.cam.release()
 
         self.mediator.emit_signal( signal_name = 'select_cam_done' )
+
+        # Pause a short bit of time before disconnecting the signal
+        # Without this pause, often the signal will not be successfully sent
+        time.sleep(0.1)
 
         # Disconnect signals from the gui object when the thread is done
         self.__init__signals(connect=False)

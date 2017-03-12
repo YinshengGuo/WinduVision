@@ -1,5 +1,20 @@
 '''
---- This is version 7.2 ---
+--- This is version 7.3 ---
+
+    Change the runtime behavior of CamEqualThread.
+
+    Make the CamEqualThread a continuous thread running concurrently with the VideoThread.
+    Triggering camera equalization is by resuming the loop in self.run().
+    With this behavior, the runtime status can be switched between paused and un-paused.
+
+    Reason for making a continuously running thread:
+        Before I instantiate a CamEqualThread object every time needed.
+        This could cause runtime problem when the user triggers the instantiation of a new
+        thread object before the previous one is done.
+
+
+
+--- Version 7.2 ---
 
     Refactor and unify the interface of camera parameters:
 
