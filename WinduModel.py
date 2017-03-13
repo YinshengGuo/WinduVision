@@ -920,7 +920,6 @@ class CamEqualThread(threading.Thread):
         self.stopping = False
         self.pausing = True
         self.isPaused = True
-        self.iter = 0
 
     def __init__signals(self, connect=True):
         '''
@@ -952,24 +951,30 @@ class CamEqualThread(threading.Thread):
             else:
                 self.isPaused = False
 
-            if self.iter > 20:
-                # Number of iteration exceeded the limit,
-                #   (1) pause camera equalization, and
-                #   (2) emit signal to the gui to show camera NOT equalized
-                self.pausing = True
-                # Reset the iteration number every time when pausing
-                self.iter = 0
-                self.mediator.emit_signal(signal_name = 'camera_equalized',
-                                                  arg = 'Iteration number > 20' )
-            self.iter += 1
-
 
 
             # --- Section of camera equalization --- #
 
-            # Adjust 'gain' of the left camera until
-            #     the average of the left image equals to the average of the right image
-            #     that is, equal brightness
+            result = self.adjust_gain(iter=20)
+            self.pausing = True
+
+            self.mediator.emit_signal(signal_name = 'camera_equalized',
+                                              arg = result            )
+
+
+
+        # --- Out of main loop, terminating the thread --- #
+
+        # Disconnect signals from the gui object when the thread is done
+        self.__init__signals(connect=False)
+
+    def adjust_gain(self, iter):
+        '''
+        Adjust 'gain' of the left camera until
+            the average of the left image equals to the average of the right image, i.e. equal brightness.
+        '''
+
+        for i in xrange(iter):
 
             # Get the current gain value of the left camera
             gain = self.video_thread.get_one_cam_parm(side='L', name='gain')
@@ -980,40 +985,26 @@ class CamEqualThread(threading.Thread):
             bright_L = np.average(self.get_roi(imgL))
 
             diff = bright_L - bright_R
-            print 'diff={}, gain={}'.format(str(diff), str(gain))
 
             # Dynamically adjust gain according to the difference
             if diff > 1:
                 gain -= int(diff)
             elif diff < -1:
                 gain -= int(diff)
+            # Condition satisfied, break the loop
             else:
-                # Condition satisfied,
-                #   (1) pause camera equalization, and
-                #   (2) emit signal to the gui to show camera equalized
-                self.pausing = True
-                # Reset the iteration number every time when pausing
-                self.iter = 0
-                self.mediator.emit_signal(signal_name = 'camera_equalized',
-                                                  arg = 'Successful')
+                break
 
             ret = self.video_thread.set_one_cam_parm(side='L', name='gain', value=gain)
+
+            # If not able to set the camera, meaning that the parameter is out of bound,
+            #     break the loop
             if not ret:
-                # If not able to set the camera, meaning that the parameter is out of bound,
-                #   (1) pause camera equalization, and
-                #   (2) emit signal to the gui to show camera NOT equalized
-                self.pausing = True
-                # Reset the iteration number every time when pausing
-                self.iter = 0
-                self.mediator.emit_signal(signal_name = 'camera_equalized',
-                                                  arg = 'Parameter out of bound' )
+                break
 
+        result = 'Adjust gain: iter={}, diff={}, gain={}'.format(str(i), str(diff), str(gain))
 
-
-        # --- Out of main loop, terminating the thread --- #
-
-        # Disconnect signals from the gui object when the thread is done
-        self.__init__signals(connect=False)
+        return result
 
     def get_roi(self, img):
 

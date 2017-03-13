@@ -1,5 +1,12 @@
 '''
---- This is version 7.5 ---
+--- This is version 7.6 ---
+
+    Restructured the main loop of the CamEqualThread class:
+        Factor out gain adjustment to a seperate method self.adjust_gain(iter)
+
+
+
+--- Version 7.5 ---
 
     (1) Fix the bug of copying right camera id to the left camera id
         in the CamEqualThread class.
