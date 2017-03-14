@@ -56,7 +56,7 @@ class WinduCore(object):
         '''
         Some high-level commands to be executed upon the software is initiated
         '''
-        self.toggle_auto_offset()
+        pass
 
     def start_video_thread(self):
         # Pass the mediator into the video thread,
@@ -832,6 +832,8 @@ class AlignThread(threading.Thread):
         self.stopping = False
         self.pausing = True
         self.isPaused = True
+
+        self.toggle() # Turn on alignment
 
     def __init__signals(self, connect=True):
         '''
