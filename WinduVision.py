@@ -1,5 +1,15 @@
 '''
---- This is version 7.6 ---
+--- This is version 7.7 ---
+
+    Some minor modifications:
+
+    Introduce limits (50, 50) to image offset in the VideoThread class.
+
+    Put toggle_auto_offset in developer mode. Automatically turn it on when initiating software.
+
+
+
+--- Version 7.6 ---
 
     Restructured the main loop of the CamEqualThread class:
         Factor out gain adjustment to a seperate method self.adjust_gain(iter)

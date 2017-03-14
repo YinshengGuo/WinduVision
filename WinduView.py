@@ -64,7 +64,7 @@ class WinduGUI(QtGui.QMainWindow):
         #    (    keys               ,   names                         , for_developer , connect_to_core )
         K = [('snapshot'             , 'Snapshot'                      ,    False      ,      True       ),
              ('toggle_recording'     , 'Record Video'                  ,    False      ,      True       ),
-             ('toggle_auto_offset'   , 'Start Auto-alignment'          ,    False      ,      True       ),
+             ('toggle_auto_offset'   , 'Start Auto-alignment'          ,    True      ,      True       ),
              ('open_info'            , 'Show Real-time Info'           ,    True       ,      False      ),
              ('open_gl_window'       , 'Open 3D Viewer'                ,    True       ,      False      ),
              ('toggle_depth_map'     , 'Show Depth Map'                ,    True       ,      True       ),
@@ -630,9 +630,9 @@ class CameraTunerWindow(TunerWindow):
 
         val = parms[self.side]
 
-        self.add_parameter(name='brightness'    , min=0   , max=255 , value=val['brightness']   , interval=1  )
-        self.add_parameter(name='contrast'      , min=0   , max=255 , value=val['contrast']     , interval=1  )
-        self.add_parameter(name='saturation'    , min=0   , max=255 , value=val['saturation']   , interval=1  )
+        self.add_parameter(name='brightness'    , min=0   , max=255 , value=val['brightness']   , interval=5  )
+        self.add_parameter(name='contrast'      , min=0   , max=255 , value=val['contrast']     , interval=5  )
+        self.add_parameter(name='saturation'    , min=0   , max=255 , value=val['saturation']   , interval=5  )
         self.add_parameter(name='gain'          , min=0   , max=127 , value=val['gain']         , interval=1  )
         self.add_parameter(name='exposure'      , min=-7  , max=-1  , value=val['exposure']     , interval=1  )
         self.add_parameter(name='white_balance' , min=3000, max=6500, value=val['white_balance'], interval=100)

@@ -56,7 +56,7 @@ class WinduCore(object):
         '''
         Some high-level commands to be executed upon the software is initiated
         '''
-        pass
+        self.toggle_auto_offset()
 
     def start_video_thread(self):
         # Pass the mediator into the video thread,
@@ -346,8 +346,10 @@ class VideoThread(threading.Thread):
     def __init__parms(self):
         # Parameters for image processing
         self.offset_x, self.offset_y = 0, 0
-        self.img_height, self.img_width, _ = self.cams.read()[0].shape
+        rows, cols, channels = self.cams.read()[0].shape
+        self.img_height, self.img_width = rows, cols
         self.zoom = 1.0
+        shape = (rows, cols, channels)
 
         fh = open('parameters/gui.json', 'r')
         gui_parms = json.loads(fh.read())
@@ -370,8 +372,7 @@ class VideoThread(threading.Thread):
         self.pausing = False
         self.isPaused = False
         self.computingDepth = False
-        self.t_0 = time.time()
-        self.t_1 = time.time()
+        self.t_series = [time.time() for i in range(30)]
 
     def set_resize_matrix(self):
         '''
@@ -513,9 +514,14 @@ class VideoThread(threading.Thread):
         Emits real-time frame-rate info to the gui
         '''
 
+        # Shift time series by one
+        self.t_series[1:] = self.t_series[:-1]
+
+        # Get the current time -> First in the series
+        self.t_series[0] = time.time()
+
         # Calculate frame rate
-        self.t_1, self.t_0 = time.time(), self.t_1
-        rate = int( 1 / (self.t_1 - self.t_0))
+        rate = len(self.t_series) / (self.t_series[0] - self.t_series[-1])
 
         text = 'Frame rate = {} fps'.format(rate)
 
@@ -525,10 +531,16 @@ class VideoThread(threading.Thread):
     # Methods commanded by the high-level core object.
 
     def set_offset(self, offset_x, offset_y):
-        self.offset_x, self.offset_y = offset_x, offset_y
-        self.set_resize_matrix()
 
-        print 'offset_x = {}, offset_y = {} \n'.format(str(self.offset_x), str(self.offset_y))
+        x_limit, y_limit = 50, 50
+
+        if abs(offset_x) > x_limit or abs(offset_y) > y_limit:
+            self.offset_x, self.offset_y = 0, 0
+
+        else:
+            self.offset_x, self.offset_y = offset_x, offset_y
+
+        self.set_resize_matrix()
 
     def detect_offset(self):
         '''
@@ -873,7 +885,7 @@ class AlignThread(threading.Thread):
             #     meaning that there is more "active movements",
             # then speed up the loop to get back to a stable condition as soon as possible.
             if abs(Y[0] - y_avg) > 1:
-                time.sleep(0.01)
+                time.sleep(0.05)
             else:
                 # Under stable condition, in which the current offset doesn't differ from the average,
                 # Check alignment every ~1 second.
@@ -956,10 +968,11 @@ class CamEqualThread(threading.Thread):
             # --- Section of camera equalization --- #
 
             result = self.adjust_gain(iter=20)
-            self.pausing = True
 
             self.mediator.emit_signal(signal_name = 'camera_equalized',
-                                              arg = result            )
+                                              arg = result + '\n'     )
+
+            self.pausing = True
 
 
 
@@ -1027,7 +1040,6 @@ class CamEqualThread(threading.Thread):
             parm_R = V.get_camera_parameters(side='R')
             camL_id = V.get_one_cam_parm(side='L', name='id')
             parm_R['id'] = camL_id
-
             V.set_camera_parameters(side='L', parameters=parm_R)
 
             self.pausing = False
