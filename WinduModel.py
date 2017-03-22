@@ -532,7 +532,7 @@ class VideoThread(threading.Thread):
 
     def set_offset(self, offset_x, offset_y):
 
-        x_limit, y_limit = 50, 50
+        x_limit, y_limit = 100, 100
 
         if abs(offset_x) > x_limit or abs(offset_y) > y_limit:
             self.offset_x, self.offset_y = 0, 0
@@ -583,13 +583,21 @@ class VideoThread(threading.Thread):
             # Define the codec, which is platform specific and can be hard to find
             # Set fourcc = -1 so that can select from the available codec
             fourcc = -1
+
+            # Some of the available codecs on Windows PCs: 'DIB ', 'I420', 'IYUV'...
+            #     which are all uncompressive codecs
+            fourcc = cv2.cv.CV_FOURCC(*'I420')
+
             # Create VideoWriter object at 30fps
             w, h = self.display_width, self.display_height
-            self.writer = cv2.VideoWriter( 'Windu Vision.avi', fourcc, 30.0, (w, h) )
-            self.recording = True
+            self.writer = cv2.VideoWriter('Windu Vision.avi', fourcc, 30.0, (w, h))
 
-            # Change the icon of the gui button
-            self.mediator.emit_signal('recording_starts')
+            if self.writer.isOpened():
+                self.recording = True
+                # Change the icon of the gui button
+                self.mediator.emit_signal('recording_starts')
+            else:
+                print 'Video writer could not be opened.'
 
         else:
             self.recording = False
@@ -1003,9 +1011,9 @@ class CamEqualThread(threading.Thread):
 
             # Dynamically adjust gain according to the difference
             if diff > 1:
-                gain -= int(diff)
+                gain -= (int(diff/2) + 1)
             elif diff < -1:
-                gain -= int(diff)
+                gain -= (int(diff/2) - 1)
             # Condition satisfied, break the loop
             else:
                 break

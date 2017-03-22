@@ -1,5 +1,19 @@
 '''
---- This is version 7.7 ---
+--- This is version 8.0 ---
+
+    In version 8.X shift the focus to video recording.
+
+    In this version figure out the fourcc codec for cv2.VideoWriter object.
+
+    Before I just put fourcc = -1, and there was a pop-up menu at runtime for selecting codec.
+    When the source code is compiled into executable, this pop-up menu does not happen.
+    Without a proper codec the VideoWriter does not work.
+
+    After figuring out the fourcc codec, not the executable version can record video.
+
+
+
+--- Version 7.7 ---
 
     Some minor modifications:
 
