@@ -90,9 +90,9 @@ class WinduCore(object):
 
     # Methods called by the controller object
 
-    def snapshot(self):
+    def snapshot(self, fname):
         if self.video_thread:
-            cv2.imwrite('snapshot.jpg', self.video_thread.imgDisplay)
+            cv2.imwrite(fname, self.video_thread.imgDisplay)
 
     def toggle_recording(self):
         if self.video_thread:
@@ -579,6 +579,9 @@ class VideoThread(threading.Thread):
         return offset_x, offset_y
 
     def toggle_recording(self):
+
+        temp_filename = 'temp.avi'
+
         if not self.recording:
             # Define the codec, which is platform specific and can be hard to find
             # Set fourcc = -1 so that can select from the available codec
@@ -591,7 +594,7 @@ class VideoThread(threading.Thread):
 
             # Create VideoWriter object at 30fps
             w, h = self.display_width, self.display_height
-            self.writer = cv2.VideoWriter('Windu Vision.avi', fourcc, 30.0, (w, h))
+            self.writer = cv2.VideoWriter(temp_filename, fourcc, 30.0, (w, h))
 
             if self.writer.isOpened():
                 self.recording = True
@@ -605,7 +608,7 @@ class VideoThread(threading.Thread):
             self.writer.release()
 
             # Change the icon of the gui button
-            self.mediator.emit_signal('recording_ends')
+            self.mediator.emit_signal('recording_ends', arg=temp_filename)
 
     def zoom_in(self):
         if self.zoom * 1.01 < 2.0:

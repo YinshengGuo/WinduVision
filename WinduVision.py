@@ -1,5 +1,11 @@
 '''
---- This is version 8.1 ---
+--- This is version 8.2 ---
+
+    Introduced file saving dialog for snapshot and video recording.
+
+
+
+--- Version 8.1 ---
 
     Downloaded the compressive X264 codec and it works!
     The recorded video file size is minute compared to uncompressive codecs like I420.

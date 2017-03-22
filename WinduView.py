@@ -1,5 +1,5 @@
 import numpy as np
-import cv2, time, sys, threading, os,json
+import cv2, time, sys, threading, os, json
 from PyQt4 import QtCore, QtGui, QtOpenGL
 from OpenGL import GL
 from WinduController import *
@@ -62,9 +62,9 @@ class WinduGUI(QtGui.QMainWindow):
         # name = text of the action/button
 
         #    (    keys               ,   names                         , for_developer , connect_to_core )
-        K = [('snapshot'             , 'Snapshot'                      ,    False      ,      True       ),
+        K = [('snapshot'             , 'Snapshot'                      ,    False      ,      False      ),
              ('toggle_recording'     , 'Record Video'                  ,    False      ,      True       ),
-             ('toggle_auto_offset'   , 'Start Auto-alignment'          ,    True      ,      True       ),
+             ('toggle_auto_offset'   , 'Start Auto-alignment'          ,    True       ,      True       ),
              ('open_info'            , 'Show Real-time Info'           ,    True       ,      False      ),
              ('open_gl_window'       , 'Open 3D Viewer'                ,    True       ,      False      ),
              ('toggle_depth_map'     , 'Show Depth Map'                ,    True       ,      True       ),
@@ -128,6 +128,23 @@ class WinduGUI(QtGui.QMainWindow):
                 QtGui.QShortcut(QtGui.QKeySequence(key_comb), self, method)
 
     # Methods called by actions of the self GUI object
+
+    def snapshot(self):
+
+        i = 1
+        while os.path.exists('stereo_image_%03d.jpg' % i):
+            i += 1
+
+        fname = QtGui.QFileDialog.getSaveFileName(parent    = self,
+                                                  directory = 'stereo_image_%03d.jpg' % i,
+                                                  caption   = 'Save stereo image',
+                                                  filter    = 'JPEG File Interchange Format (*.jpg)')
+        if fname != '':
+            fname = str(fname)
+            if not fname.endswith('.jpg'):
+                fname = fname + '.jpg'
+            self.controller.call_method(method_name = 'snapshot',
+                                        arg         = fname     )
 
     def open_info(self):
         if not self.info_window.isVisible():
@@ -285,9 +302,26 @@ class WinduGUI(QtGui.QMainWindow):
         self.actions['toggle_recording'].setIcon(QtGui.QIcon('icons/stop_recording.png'))
         self.actions['toggle_recording'].setText('Stop')
 
-    def recording_ends(self):
+    def recording_ends(self, temp_filename):
         self.actions['toggle_recording'].setIcon(QtGui.QIcon('icons/toggle_recording.png'))
         self.actions['toggle_recording'].setText('Record Video')
+
+        i = 1
+        while os.path.exists('stereo_video_%03d.avi' % i):
+            i += 1
+
+        fname = QtGui.QFileDialog.getSaveFileName(parent    = self,
+                                                  directory = 'stereo_video_%03d.avi' % i,
+                                                  caption   = 'Save stereo video',
+                                                  filter    = 'Audio Video Interleaved (*.avi)')
+        if fname != '':
+            fname = str(fname)
+            if not fname.endswith('.avi'):
+                fname = fname + '.avi'
+            os.rename(temp_filename, fname)
+
+        else:
+            os.remove(temp_filename)
 
     def auto_offset_resumed(self):
         self.actions['toggle_auto_offset'].setIcon(QtGui.QIcon('icons/pause_auto_offset.png'))
