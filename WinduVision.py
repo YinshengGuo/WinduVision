@@ -1,5 +1,12 @@
 '''
---- This is version 8.0 ---
+--- This is version 8.1 ---
+
+    Downloaded the compressive X264 codec and it works!
+    The recorded video file size is minute compared to uncompressive codecs like I420.
+
+
+
+--- Version 8.0 ---
 
     In version 8.X shift the focus to video recording.
 

@@ -584,9 +584,10 @@ class VideoThread(threading.Thread):
             # Set fourcc = -1 so that can select from the available codec
             fourcc = -1
 
-            # Some of the available codecs on Windows PCs: 'DIB ', 'I420', 'IYUV'...
+            # Some of the available codecs on native Windows PC: 'DIB ', 'I420', 'IYUV'...
             #     which are all uncompressive codecs
-            fourcc = cv2.cv.CV_FOURCC(*'I420')
+            # The compressive X264 codec needs to be installed seperately before use
+            fourcc = cv2.cv.CV_FOURCC(*'X264')
 
             # Create VideoWriter object at 30fps
             w, h = self.display_width, self.display_height

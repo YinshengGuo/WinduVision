@@ -144,7 +144,7 @@ class WinduGUI(QtGui.QMainWindow):
         L, R = self.camera_tuner_window_L, self.camera_tuner_window_R
 
         L.move(200, 200)
-        R.move(300, 300)
+        R.move(400, 300)
 
         L.update_parameter()
         R.update_parameter()
