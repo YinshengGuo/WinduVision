@@ -438,11 +438,6 @@ class ProcessThread(threading.Thread):
 
         self.set_resize_matrix()
 
-        # Prepare empty 'processed' images
-        rows, cols = self.display_height, self.display_width / 2 # Output image dimension
-        self.imgR_proc = np.zeros((rows, cols, 3), np.uint8)
-        self.imgL_proc = np.zeros((rows, cols, 3), np.uint8)
-
 
 
         # Parameters for stereo depth map
@@ -504,8 +499,14 @@ class ProcessThread(threading.Thread):
 
 
 
-        # Define self.imgDisplay, which is the image to be emitted to the GUI object.
-        self.imgDisplay = np.zeros( (self.display_height, self.display_width, 3), np.uint8 )
+        # Define the dimensions of:
+        #     self.imgR_proc  --- processed R image to be accessed externally
+        #     self.imgL_proc  ---           L image
+        #     self.imgDisplay --- display image to be emitted to the GUI object
+        rows, cols = self.display_height, self.display_width
+        self.imgR_proc  = np.zeros((rows, cols/2, 3), np.uint8)
+        self.imgL_proc  = np.zeros((rows, cols/2, 3), np.uint8)
+        self.imgDisplay = np.zeros((rows, cols  , 3), np.uint8)
 
     def run(self):
         '''
@@ -681,7 +682,7 @@ class ProcessThread(threading.Thread):
 
     def toggle_recording(self):
 
-        temp_filename = 'temp.avi'
+        self.temp_video_fname = 'temp.avi'
 
         if not self.recording:
             # Define the codec, which is platform specific and can be hard to find
@@ -695,7 +696,7 @@ class ProcessThread(threading.Thread):
 
             # Create VideoWriter object at 30fps
             w, h = self.display_width, self.display_height
-            self.writer = cv2.VideoWriter(temp_filename, fourcc, self.fps, (w, h))
+            self.writer = cv2.VideoWriter(self.temp_video_fname, fourcc, self.fps, (w, h))
 
             if self.writer.isOpened():
                 self.recording = True
@@ -708,8 +709,9 @@ class ProcessThread(threading.Thread):
             self.recording = False
             self.writer.release()
 
-            # Change the icon of the gui button
-            self.mediator.emit_signal('recording_ends', arg=temp_filename)
+            # Signal gui to change the icon of the button...
+            #     and let the user to rename the temp file
+            self.mediator.emit_signal('recording_ends', arg=self.temp_video_fname)
 
     def zoom_in(self):
         if self.zoom * 1.01 < 2.0:
@@ -742,6 +744,9 @@ class ProcessThread(threading.Thread):
         if self.recording:
             self.recording = False
             self.writer.release()
+
+            # Remove the temporary video file as the recording is not properly stopped.
+            os.remove(self.temp_video_fname)
 
         # Shut off main loop in self.run()
         self.stopping = True

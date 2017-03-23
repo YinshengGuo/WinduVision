@@ -1,5 +1,12 @@
 '''
---- This is version 8.4 ---
+--- This is version 8.5 ---
+
+    Fixed the bug when switching to full screen by...
+        changing the image dimension of imgR_proc and imgL_proc in the ProcessThread class
+
+
+
+--- Version 8.4 ---
 
     Time the main loop in the ProcessThread class.
 
