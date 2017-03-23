@@ -1,5 +1,14 @@
 '''
---- This is version 8.3 ---
+--- This is version 8.4 ---
+
+    Time the main loop in the ProcessThread class.
+
+    The timing goes down to the level of milliseconds, which makes it less reliable across platforms...
+        especially in Windows.
+
+
+
+--- Version 8.3 ---
 
     Major structural changes in the Model.
 

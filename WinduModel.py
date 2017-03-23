@@ -458,6 +458,7 @@ class ProcessThread(threading.Thread):
         self.isPaused = False
         self.computingDepth = False
         self.t_series = [time.time() for i in range(30)]
+        self.fps = 30.0
 
     def set_resize_matrix(self):
         '''
@@ -517,6 +518,9 @@ class ProcessThread(threading.Thread):
         ( ) Compute depth map (optional).
         (3) Combine images.
         '''
+
+        t0 = time.clock()
+
         while not self.stopping:
 
             # Pausing the loop (or not)
@@ -576,6 +580,17 @@ class ProcessThread(threading.Thread):
             # Record video
             if self.recording:
                 self.writer.write(self.imgDisplay)
+
+
+
+            # Time the loop
+            while (time.clock() - t0) < (1./self.fps):
+                # Sleeping for < 15 ms is not reliable across different platforms.
+                # Windows PCs generally have a minimum sleeping time > ~15 ms...
+                #     making this timer exceeding the specified period.
+                time.sleep(0.001)
+
+            t0 = time.clock()
 
         # Disconnect signals from the gui object when the thread is done
         self.__init__signals(connect=False)
@@ -680,7 +695,7 @@ class ProcessThread(threading.Thread):
 
             # Create VideoWriter object at 30fps
             w, h = self.display_width, self.display_height
-            self.writer = cv2.VideoWriter(temp_filename, fourcc, 30.0, (w, h))
+            self.writer = cv2.VideoWriter(temp_filename, fourcc, self.fps, (w, h))
 
             if self.writer.isOpened():
                 self.recording = True
