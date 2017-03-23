@@ -1,5 +1,27 @@
 '''
---- This is version 8.2 ---
+--- This is version 8.3 ---
+
+    Major structural changes in the Model.
+
+    Split the VideoThread class into two classes:
+
+        CaptureThread: A thread that possesses the dual camera and ONLY captures images on runtime.
+
+        ProcessThread: A thread that fetches images from the CaptureThread, process and display it to gui.
+
+    By this split, I am completely decoupling image capturing and image processing. Hence both
+    capturing and processing can run at full speed simultaneously. Since it runs faster, it is
+    possible to TIME the image processing (and display) loop at an fps >= 30.
+
+    With a steadily timed frame rate, the cv2.VideoWriter in the ProcessThread can record at a
+    correct frame rate.
+
+    There were a lot of code refactoring, but the methods in the old VideoThread were pretty much
+    ditributed in the two new classes - CaptureThread and ProcessThread - unchanged.
+
+
+
+--- Version 8.2 ---
 
     Introduced file saving dialog for snapshot and video recording.
 
