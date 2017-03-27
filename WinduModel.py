@@ -1066,12 +1066,26 @@ class CamEqualThread(threading.Thread):
 
 
 
+            # --- Section of camera tuning --- #
+
+            result1 = self.tune_camera(iter=20)
+
+
+
             # --- Section of camera equalization --- #
 
-            result = self.adjust_gain(iter=20)
+            self.copy_parameters()
+
+            result2 = self.adjust_gain(iter=20)
+
+
+
+            # --- Showing results to GUI --- #
+
+            results = result1 + '\n' + result2 + '\n'
 
             self.mediator.emit_signal(signal_name = 'camera_equalized',
-                                              arg = result + '\n'     )
+                                              arg = results           )
 
             self.pausing = True
 
@@ -1081,6 +1095,86 @@ class CamEqualThread(threading.Thread):
 
         # Disconnect signals from the gui object when the thread is done
         self.__init__signals(connect=False)
+
+    def tune_camera(self, iter):
+        '''
+        Tune the right camera: exposure and gain
+        '''
+
+        goal = 128 # goal of image lighting
+
+
+
+        # Set brightness, contrast, gain to default before tuning exposure
+        default = {'brightness'   : 100 ,
+                   'contrast'     : 50  ,
+                   'gain'         : 64  }
+
+        for name, value in default.items():
+            self.capture_thread.set_one_cam_parm(side='R', name=name, value=value)
+
+        # Try exposure values from -2 to -5
+        min_diff = 255
+        for exp in xrange(-2, -6, -1):
+
+            self.capture_thread.set_one_cam_parm(side='R', name='exposure', value=exp)
+            time.sleep(0.5) # Wait for the camera configuration to take effect. Setting exposure takes longer time.
+
+            imgR, imgL = self.capture_thread.get_images()
+            imgR = self.get_roi(imgR)
+
+            diff = goal - np.average(imgR)
+
+            # Get the exposure which gives the min difference
+            if abs(diff) < min_diff:
+                min_diff = abs(diff)
+                exposure = exp
+
+        self.capture_thread.set_one_cam_parm(side='R', name='exposure', value=exposure)
+        time.sleep(0.5) # Wait for the camera configuration to take effect. Setting exposure takes longer time.
+
+
+
+        # Tune gain value until the intensity difference <= 1
+        gain = default['gain']
+        for i in xrange(iter):
+
+            imgR, imgL = self.capture_thread.get_images()
+            imgR = self.get_roi(imgR)
+
+            diff = goal - np.average(imgR)
+
+            # Dynamically adjust gain according to the difference
+            if diff > 1:
+                gain += (int(diff/2) + 1)
+            elif diff < -1:
+                gain += (int(diff/2) - 1)
+            else:
+                break # Condition satisfied, break the loop
+
+            ret = self.capture_thread.set_one_cam_parm(side='R', name='gain', value=gain)
+            time.sleep(0.1) # Wait for the camera configuration to take effect.
+
+            # If not able to set the camera, meaning that the parameter is out of bound,
+            #     break the loop
+            if not ret:
+                break
+
+
+
+        # Return tuning result summary
+        result = 'Tune camR: exposure={}, gain={}, iter={}, diff={}'.format(str(exposure), str(gain), str(i), str(diff))
+        return result
+
+    def copy_parameters(self):
+        '''
+        Copy the right camera parameters to the left camera.
+        '''
+
+        V = self.capture_thread
+        parameters = V.get_camera_parameters(side='R')
+        parameters['id'] = V.get_one_cam_parm(side='L', name='id') # except the id of the left cam
+        V.set_camera_parameters(side='L', parameters=parameters)
 
     def adjust_gain(self, iter):
         '''
@@ -1098,25 +1192,25 @@ class CamEqualThread(threading.Thread):
             bright_R = np.average(self.get_roi(imgR))
             bright_L = np.average(self.get_roi(imgL))
 
-            diff = bright_L - bright_R
+            diff = bright_R - bright_L
 
             # Dynamically adjust gain according to the difference
             if diff > 1:
-                gain -= (int(diff/2) + 1)
+                gain += (int(diff/2) + 1)
             elif diff < -1:
-                gain -= (int(diff/2) - 1)
-            # Condition satisfied, break the loop
+                gain += (int(diff/2) - 1)
             else:
-                break
+                break # Condition satisfied, break the loop
 
             ret = self.capture_thread.set_one_cam_parm(side='L', name='gain', value=gain)
+            time.sleep(0.1) # Wait for the camera configuration to take effect.
 
             # If not able to set the camera, meaning that the parameter is out of bound,
             #     break the loop
             if not ret:
                 break
 
-        result = 'Adjust gain: iter={}, diff={}, gain={}'.format(str(i), str(diff), str(gain))
+        result = 'Tune camL: gain={}, iter={}, diff={}'.format(str(gain), str(i), str(diff))
 
         return result
 
@@ -1134,15 +1228,6 @@ class CamEqualThread(threading.Thread):
     def resume(self):
 
         if self.pausing:
-            V = self.capture_thread
-
-            # Every time when camera equalization is resumed,
-            # copy the right camera parameters to the left camera.
-            parm_R = V.get_camera_parameters(side='R')
-            camL_id = V.get_one_cam_parm(side='L', name='id')
-            parm_R['id'] = camL_id
-            V.set_camera_parameters(side='L', parameters=parm_R)
-
             self.pausing = False
 
     def stop(self):
@@ -1194,8 +1279,6 @@ class CamSelectThread(threading.Thread):
 
             if self.cam.isOpened():
                 _, img = self.cam.read()
-
-                print img.shape
 
                 data = {'id': id, 'img': img}
 

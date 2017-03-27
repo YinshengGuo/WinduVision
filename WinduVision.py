@@ -1,5 +1,15 @@
 '''
---- This is version 8.5 ---
+--- This is version 8.6 ---
+
+    Automatic camera (right) tuning for correct lighting:
+
+        (1) Set default brightness, contrast and gain
+        (2) Adjust exposure until the image lighting is the closest to the goal (usually 128)
+        (3) Adjust gain until the difference (between image lighting and goal) < 1
+
+
+
+--- Version 8.5 ---
 
     Fixed the bug when switching to full screen by...
         changing the image dimension of imgR_proc and imgL_proc in the ProcessThread class
