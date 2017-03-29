@@ -4,108 +4,16 @@ from constants import *
 
 
 
-class CaptureThread(threading.Thread):
-
-    def __init__(self, which_cam):
-        '''
-        which_cam: could be one of the three constants [CAM_R, CAM_L or CAM_E]
-        '''
-        super(CaptureThread, self).__init__()
-
-        self.which_cam = which_cam
-
-        self.__init__parms()
-
-        # The customized single-camera object is...
-        #     a low-level object of the CaptureThread object
-        self.cam = SingleCamera(which_cam)
-        self.img = self.cam.read()
-
-    def __init__parms(self):
-        # Parameters for looping, control and timing
-        self.stopping = False
-        self.pausing = False
-        self.isPaused = False
-
-    def run(self):
-
-        # The main loop of this CaptureThread is NOT timed
-        # It runs at the rate determined by a single camera hardware
-        while not self.stopping:
-
-            # Pausing the loop (or not)
-            if self.pausing:
-                self.isPaused = True
-                time.sleep(0.1)
-                continue
-            else:
-                self.isPaused = False
-
-            # Read the images from the cameras
-            self.img = self.cam.read()
-            # print self.which_cam
-
-        # Close camera hardware when the image-capturing main loop is done.
-        self.cam.close()
-
-    def pause(self):
-        self.pausing = True
-        # Wait until the main loop is really paused before completing this method call
-        while not self.isPaused:
-            time.sleep(0.1)
-        return
-
-    def resume(self):
-        self.pausing = False
-        # Wait until the main loop is really resumed before completing this method call
-        while self.isPaused:
-            time.sleep(0.1)
-        return
-
-    def stop(self):
-        'Called to terminate the video thread.'
-
-        # Shut off main loop in self.run()
-        self.stopping = True
-
-    def set_camera_parameters(self, parameters):
-
-        if self.cam:
-            self.cam.set_parameters(parameters)
-
-    def get_camera_parameters(self):
-
-        if self.cam:
-            return self.cam.get_parameters()
-
-    def set_one_cam_parm(self, name, value):
-
-        if self.cam:
-            return self.cam.set_one_parm(name, value)
-
-    def get_one_cam_parm(self, name):
-
-        if self.cam:
-            return self.cam.get_one_parm(name)
-
-    def get_image(self):
-        return self.img
-
-
-
-class SingleCamera(object):
+class SingletonCamera(object):
     '''
-    A customized camera API.
-
-    One cv2.VideoCapture object is instantiated.
-    If not successfully instantiated, then the VideoCapture object is None.
+    A singleton camera object that directly operates all physical cameras through cv2.VideoCapture().
     '''
 
-    def __init__(self, which_cam):
+    def __init__(self, keys):
         '''
-        which_cam: could be one of the three constants [CAM_R, CAM_L or CAM_E]
+        keys: a list of camera keys (CAM_R, CAM_L or CAM_E)
         '''
-        super(SingleCamera, self).__init__()
+        super(SingletonCamera, self).__init__()
 
         self.which_cam = which_cam
 

@@ -4,10 +4,10 @@ import cv2, time, sys, threading
 
 
 class CamSelectThread(threading.Thread):
-    def __init__(self, mediator_obj):
+    def __init__(self, mediator):
         super(CamSelectThread, self).__init__()
 
-        self.mediator = mediator_obj
+        self.mediator = mediator
 
         self.__init__parameters()
 

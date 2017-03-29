@@ -8,9 +8,9 @@ from constants import *
 
 
 class WinduGUI(QtGui.QMainWindow):
-    def __init__(self, controller_obj):
+    def __init__(self, controller):
         super(WinduGUI, self).__init__()
-        self.controller = controller_obj
+        self.controller = controller
 
         self.__init__gui_parameters()
 
@@ -38,10 +38,11 @@ class WinduGUI(QtGui.QMainWindow):
 
         self.info_window = TextWindow()
         self.progress_bar = ProgressBar()
-        self.gl_window = GLWindow( controller_obj = self.controller )
-        self.depth_tuner_window = DepthTunerWindow( controller_obj = self.controller )
-        self.camera_tuner_window_R = CameraTunerWindow( controller_obj=self.controller, which_cam=CAM_R )
-        self.camera_tuner_window_L = CameraTunerWindow( controller_obj=self.controller, which_cam=CAM_L )
+        self.gl_window = GLWindow( controller = self.controller )
+        self.depth_tuner_window = DepthTunerWindow( controller = self.controller )
+        self.camera_tuner_window_R = CameraTunerWindow( controller=self.controller, which_cam=CAM_R )
+        self.camera_tuner_window_L = CameraTunerWindow( controller=self.controller, which_cam=CAM_L )
+        self.camera_tuner_window_E = CameraTunerWindow( controller=self.controller, which_cam=CAM_E )
 
         self.__init__toolbtns()
         self.__init__key_shortcut()
@@ -74,7 +75,7 @@ class WinduGUI(QtGui.QMainWindow):
              ('open_camera_tuner'    , 'Adjust Camera Parameters'      ,    False      ,      False      ),
              ('equalize_cameras'     , 'Equalize Cameras'              ,    False      ,      True       ),
              ('toggle_fullscreen'    , 'Show Fullscreen'               ,    False      ,      False      ),
-             ('toggle_view'          , 'Switch View'                   ,    False      ,      True       )]
+             ('toggle_view_mode'     , 'Switch View'                   ,    False      ,      True       )]
 
         self.actions = {}
         self.toolbtns = {}
@@ -161,16 +162,17 @@ class WinduGUI(QtGui.QMainWindow):
         self.depth_tuner_window.show()
 
     def open_camera_tuner(self):
-        L, R = self.camera_tuner_window_L, self.camera_tuner_window_R
+        L = self.camera_tuner_window_L
+        R = self.camera_tuner_window_R
+        E = self.camera_tuner_window_E
 
         L.move(200, 200)
-        R.move(400, 300)
+        R.move(400, 200)
+        E.move(600, 200)
 
-        L.update_parameter()
-        R.update_parameter()
-
-        L.show()
-        R.show()
+        for window in [L, R, E]:
+            window.update_parameter()
+            window.show()
 
     def toggle_fullscreen(self):
         if self.isFullScreen():
@@ -226,7 +228,8 @@ class WinduGUI(QtGui.QMainWindow):
                            self.gl_window            ,
                            self.depth_tuner_window   ,
                            self.camera_tuner_window_R,
-                           self.camera_tuner_window_L]
+                           self.camera_tuner_window_L,
+                           self.camera_tuner_window_E]
 
             for win in window_list:
                 win.close()
@@ -612,10 +615,10 @@ class DepthTunerWindow(TunerWindow):
     This class also manages the transfer of depth parameters
     to the core object.
     '''
-    def __init__(self, controller_obj):
+    def __init__(self, controller):
         super(DepthTunerWindow, self).__init__()
 
-        self.controller = controller_obj
+        self.controller = controller
 
         self.setWindowIcon(QtGui.QIcon('icons/windu_vision.png'))
         self.setWindowTitle('Stereo Depth Parameters')
@@ -648,21 +651,25 @@ class CameraTunerWindow(TunerWindow):
     This class also manages the transfer of camera parameters
     to the core object.
     '''
-    def __init__(self, controller_obj, which_cam):
+    def __init__(self, controller, which_cam):
         super(CameraTunerWindow, self).__init__()
 
-        self.controller = controller_obj
+        self.controller = controller
         self.which_cam = which_cam
 
         self.setWindowIcon(QtGui.QIcon('icons/windu_vision.png'))
         self.setMinimumWidth(600)
 
-        if self.which_cam == CAM_R:
-            self.setWindowTitle('Right Camera Parameters')
+        if which_cam == CAM_R:
+            title = 'Right Camera'
+        elif which_cam == CAM_L:
+            title = 'Left Camera'
         else:
-            self.setWindowTitle('Left Camera Parameters')
+            title = 'Ambient Camera'
 
-        filepath = 'parameters/' + self.which_cam + '.json'
+        self.setWindowTitle(title)
+
+        filepath = 'parameters/' + which_cam + '.json'
         with open(filepath, 'r') as fh:
             parms = json.loads(fh.read())
 
@@ -699,9 +706,9 @@ class CameraTunerWindow(TunerWindow):
 
 
 class GLWindow(QtGui.QMainWindow):
-    def __init__(self, controller_obj):
+    def __init__(self, controller):
         super(GLWindow, self).__init__()
-        self.controller = controller_obj
+        self.controller = controller
 
         self.setWindowTitle('3D Topography')
         self.setWindowIcon(QtGui.QIcon('icons/windu_vision.png'))
@@ -796,7 +803,7 @@ class GLWidget(QtOpenGL.QGLWidget):
         GL.glColorMaterial(GL.GL_FRONT_AND_BACK, GL.GL_AMBIENT_AND_DIFFUSE)
         GL.glEnable(GL.GL_COLOR_MATERIAL)
 
-        self.gl_object = None
+        self.glect = None
 
     def resizeGL(self, width, height):
         GL.glViewport(0, 0, 960, 640)
@@ -812,8 +819,8 @@ class GLWidget(QtOpenGL.QGLWidget):
         GL.glRotated(self.xRot / 16.0, 1.0, 0.0, 0.0)
         GL.glRotated(self.yRot / 16.0, 0.0, 1.0, 0.0)
         GL.glRotated(self.zRot / 16.0, 0.0, 0.0, 1.0)
-        if not self.gl_object is None:
-            GL.glCallList(self.gl_object)
+        if not self.glect is None:
+            GL.glCallList(self.glect)
 
     # Mouse events
 
@@ -860,7 +867,7 @@ class GLWidget(QtOpenGL.QGLWidget):
         return genList
 
     def updateObject(self, vertices):
-        self.gl_object = self.makeObject(vertices)
+        self.glect = self.makeObject(vertices)
 
     def setXRotation(self, angle):
         angle = self.normalizeAngle(angle)
@@ -904,7 +911,7 @@ class GLWidget(QtOpenGL.QGLWidget):
 if __name__ == '__main__':
     app = QtGui.QApplication(sys.argv)
 
-    gui = WinduGUI( controller_obj = MockController() )
+    gui = WinduGUI( controller = MockController() )
     gui.show()
 
     sys.exit(app.exec_())

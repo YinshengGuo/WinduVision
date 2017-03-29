@@ -27,7 +27,7 @@ class ProcessThread(threading.Thread):
 
         The parameter 'connect' specifies whether connect or disconnect signals.
         '''
-        signal_names = ['display_image', 'recording_starts', 'recording_ends', 'set_info_text']
+        signal_names = ['display_image', 'set_info_text']
 
         if connect:
             self.mediator.connect_signals(signal_names)
@@ -56,7 +56,6 @@ class ProcessThread(threading.Thread):
 
 
         # Parameters for looping, control and timing
-        self.recording = False
         self.stopping = False
         self.pausing = False
         self.isPaused = False
@@ -67,7 +66,7 @@ class ProcessThread(threading.Thread):
     def set_resize_matrix(self):
         '''
         Define the transformation matrix for the image processing pipeline.
-        Also define the dimension of self.imgDisplay, which is the terminal image to be displayed in the GUI.
+        Also define the dimension of self.img_display, which is the terminal image to be displayed in the GUI.
         '''
 
         img = self.capture_thread_R.get_image()
@@ -124,11 +123,11 @@ class ProcessThread(threading.Thread):
         # Define the dimensions of:
         #     self.imgR_proc  --- processed R image to be accessed externally
         #     self.imgL_proc  ---           L image
-        #     self.imgDisplay --- display image to be emitted to the GUI object
+        #     self.img_display --- display image to be emitted to the GUI object
         rows, cols = self.display_height, self.display_width
         self.imgR_proc  = np.zeros((rows, cols/2, 3), np.uint8)
         self.imgL_proc  = np.zeros((rows, cols/2, 3), np.uint8)
-        self.imgDisplay = np.zeros((rows, cols  , 3), np.uint8)
+        self.img_display = np.zeros((rows, cols  , 3), np.uint8)
 
     def run(self):
         '''
@@ -191,19 +190,13 @@ class ProcessThread(threading.Thread):
 
             # (3) Combine images.
             h, w = self.display_height, self.display_width
-            self.imgDisplay[:, 0:(w/2), :] = self.imgL_1
-            self.imgDisplay[:, (w/2):w, :] = self.imgR_1
+            self.img_display[:, 0:(w/2), :] = self.imgL_1
+            self.img_display[:, (w/2):w, :] = self.imgR_1
 
             self.mediator.emit_signal( signal_name = 'display_image',
-                                       arg = self.imgDisplay )
+                                       arg = self.img_display )
 
             self.emit_fps_info()
-
-
-
-            # Record video
-            if self.recording:
-                self.writer.write(self.imgDisplay)
 
 
 
@@ -304,39 +297,6 @@ class ProcessThread(threading.Thread):
 
         return offset_x, offset_y
 
-    def toggle_recording(self):
-
-        self.temp_video_fname = 'temp.avi'
-
-        if not self.recording:
-            # Define the codec, which is platform specific and can be hard to find
-            # Set fourcc = -1 so that can select from the available codec
-            fourcc = -1
-
-            # Some of the available codecs on native Windows PC: 'DIB ', 'I420', 'IYUV'...
-            #     which are all uncompressive codecs
-            # The compressive X264 codec needs to be installed seperately before use
-            fourcc = cv2.cv.CV_FOURCC(*'X264')
-
-            # Create VideoWriter object at 30fps
-            w, h = self.display_width, self.display_height
-            self.writer = cv2.VideoWriter(self.temp_video_fname, fourcc, self.fps, (w, h))
-
-            if self.writer.isOpened():
-                self.recording = True
-                # Change the icon of the gui button
-                self.mediator.emit_signal('recording_starts')
-            else:
-                print 'Video writer could not be opened.'
-
-        else:
-            self.recording = False
-            self.writer.release()
-
-            # Signal gui to change the icon of the button...
-            #     and let the user to rename the temp file
-            self.mediator.emit_signal('recording_ends', arg=self.temp_video_fname)
-
     def zoom_in(self):
         if self.zoom * 1.01 < 2.0:
             self.zoom = self.zoom * 1.01
@@ -364,14 +324,6 @@ class ProcessThread(threading.Thread):
     def stop(self):
         'Called to terminate the video thread.'
 
-        # Stop recording
-        if self.recording:
-            self.recording = False
-            self.writer.release()
-
-            # Remove the temporary video file as the recording is not properly stopped.
-            os.remove(self.temp_video_fname)
-
         # Shut off main loop in self.run()
         self.stopping = True
 
@@ -391,4 +343,6 @@ class ProcessThread(threading.Thread):
     def get_processed_images(self):
         return self.imgR_proc, self.imgL_proc
 
+    def get_display_image(self):
+        return self.img_display
 

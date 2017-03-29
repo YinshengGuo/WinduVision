@@ -8,11 +8,11 @@ class AlignThread(threading.Thread):
     This thread runs concurrently with the VideoThread,
     dynamically checking if the stereo pair of images are aligned.
     '''
-    def __init__(self, process_thread_obj, mediator_obj):
+    def __init__(self, process_thread, mediator):
         super(AlignThread, self).__init__()
 
-        self.process_thread = process_thread_obj
-        self.mediator = mediator_obj
+        self.process_thread = process_thread
+        self.mediator = mediator
 
         self.__init__signals()
 
@@ -101,4 +101,6 @@ class AlignThread(threading.Thread):
         # Shut off main loop in self.run()
         self.stopping = True
 
+    def set_process_thread(self, thread):
+        self.process_thread = thread
 

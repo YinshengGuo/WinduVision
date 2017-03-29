@@ -11,9 +11,9 @@ class Mediator(QtCore.QThread):
     Mediator defines the interface to emit signals to the gui object.
     Each signal is defined by a unique str 'signal_name'.
     '''
-    def __init__(self, gui_obj):
+    def __init__(self, gui):
         super(Mediator, self).__init__()
-        self.gui = gui_obj
+        self.gui = gui
 
     def __del__(self):
         self.exiting = True
@@ -56,9 +56,9 @@ class Controller(object):
     A purely administrative-logic object, which
     parametrizes and calls the method name in the core object.
     '''
-    def __init__(self, core_obj):
+    def __init__(self, core):
         super(Controller, self).__init__()
-        self.core = core_obj
+        self.core = core
 
     def call_method(self, method_name, arg=None):
 

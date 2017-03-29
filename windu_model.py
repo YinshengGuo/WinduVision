@@ -4,11 +4,7 @@ from OpenGL import GL
 
 from windu_view import *
 from windu_controller import *
-from capture_thread import *
-from process_thread import *
-from align_thread import *
-from cam_equal_thread import *
-from cam_select_thread import *
+from windu_threads import *
 from constants import *
 
 
@@ -21,12 +17,12 @@ class WinduCore(object):
         # Instantiate a controller object.
         # Pass the core object into the controller object,
         # so the controller can call the core.
-        self.controller = Controller(core_obj = self)
+        self.controller = Controller(core = self)
 
         # Instantiate a gui object.
         # Pass the controller object into the gui object,
         # so the gui can call the controller, which in turn calls the core
-        self.gui = WinduGUI(controller_obj = self.controller)
+        self.gui = WinduGUI(controller = self.controller)
         self.gui.show()
 
         # The mediator is a channel to emit any signal to the gui object.
@@ -67,34 +63,37 @@ class WinduCore(object):
 
     def start_video_thread(self):
 
-        # --- --- #
+        #------ 3 capture threads for 3 cameras ------#
         self.cap_threads = {}
-        for key in (CAM_R, CAM_L, CAM_E):
-            self.cap_threads[key] = CaptureThread(whichCam=key)
+        for key in [CAM_R, CAM_L, CAM_E]:
+            self.cap_threads[key] = CaptureThread(which_cam=key)
             self.cap_threads[key].start()
 
 
 
-        # --- --- #
+        #------ 2 process threads for 2 viewing scenarios ------#
         self.proc_threads = {}
+        # The microscope-view processing thread takes CAM_R and CAM_L capture threads
         self.proc_threads[MICRO] = ProcessThread(capture_thread_R = self.cap_threads[CAM_R],
                                                  capture_thread_L = self.cap_threads[CAM_L],
                                                          mediator = self.mediator)
 
+        # The ambient-view processing thread takes CAM_E capture thread for both eyes
         self.proc_threads[AMBIENT] = ProcessThread(capture_thread_R = self.cap_threads[CAM_E],
                                                    capture_thread_L = self.cap_threads[CAM_E],
                                                            mediator = self.mediator)
-
+        # Start all processing threads
         for t in self.proc_threads.values():
             t.start()
 
+        # Pause the one that's not active
         self.proc_threads[AMBIENT].pause()
-        self.view_status = MICRO
+        self.view_mode = MICRO
         self.active_proc_thread = self.proc_threads[MICRO]
 
 
 
-        # --- --- #
+        #------ The camera equalizer operates on CAM_R and CAM_L capture threads ------#
         self.cam_equal_thread = CamEqualThread(capture_thread_R = self.cap_threads[CAM_R],
                                                capture_thread_L = self.cap_threads[CAM_L],
                                                        mediator = self.mediator)
@@ -102,16 +101,24 @@ class WinduCore(object):
 
 
 
-        # --- --- #
-        self.align_thread = AlignThread(process_thread_obj = self.active_proc_thread,
-                                              mediator_obj = self.mediator)
+        #------ The align_thread operates on the active process thread ------#
+        self.align_thread = AlignThread(process_thread = self.active_proc_thread,
+                                              mediator = self.mediator)
         self.align_thread.start()
+
+
+
+        #------ The writer_thread operates on the active process thread ------#
+        self.writer_thread = WriterThread(process_thread = self.active_proc_thread,
+                                                mediator = self.mediator)
+        self.writer_thread.start()
 
     def stop_video_thread(self):
         # The order of stopping is the reverse of start_video_thread()...
         #     because the least dependent ones should be closed at last
 
         self.align_thread.stop()
+        self.writer_thread.stop()
         self.cam_equal_thread.stop()
 
         for k, t in self.proc_threads.items():
@@ -133,20 +140,25 @@ class WinduCore(object):
         cv2.imwrite(fname, self.active_proc_thread.imgDisplay)
 
     def toggle_recording(self):
-        self.active_proc_thread.toggle_recording()
+        self.writer_thread.toggle_recording()
 
     def toggle_auto_offset(self):
         self.align_thread.toggle()
 
-    def toggle_view(self):
+    def toggle_view_mode(self):
         self.active_proc_thread.pause()
 
-        if self.view_status == MICRO:
+        if self.view_mode == MICRO:
             self.active_proc_thread = self.proc_threads[AMBIENT]
-            self.view_status = AMBIENT
+            self.view_mode = AMBIENT
         else:
             self.active_proc_thread = self.proc_threads[MICRO]
-            self.view_status = MICRO
+            self.view_mode = MICRO
+
+        # Update active_process_thread to...
+        #     the align_thread and writer_thread
+        self.align_thread.set_process_thread(self.active_proc_thread)
+        self.writer_thread.set_process_thread(self.active_proc_thread)
 
         self.active_proc_thread.resume()
 
@@ -308,7 +320,7 @@ class WinduCore(object):
     def start_select_cam(self):
         self.stop_video_thread()
 
-        self.cam_select_thread = CamSelectThread(mediator_obj = self.mediator)
+        self.cam_select_thread = CamSelectThread(self.mediator)
         self.cam_select_thread.start()
 
     def save_cam_id(self, data):

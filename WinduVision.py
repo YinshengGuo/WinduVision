@@ -1,5 +1,15 @@
 '''
---- This is version 9.0 ---
+--- This is version 9.1 ---
+
+    Extract the VideoWriter from the process thread...
+        and make it as an independent writer thread.
+
+    The writer thread needs to use the active process thread...
+        to record current displayed images in the video file.
+
+
+
+--- Version 9.0 ---
 
     From version 8.6 to 9.0 is a major overhaul.
 
