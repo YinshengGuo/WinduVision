@@ -1,5 +1,37 @@
 '''
---- This is version 8.6 ---
+--- This is version 9.0 ---
+
+    From version 8.6 to 9.0 is a major overhaul.
+
+    On the surface the codes have been spread out to more files.
+
+    I attempted to add the third ambient (or extra) camera and...
+        the capture thread became too slow...
+        because three cameras were operated in a single loop.
+
+    Therefore I created 3 seperate capturing threads named with constants CAM_R, CAM_L, CAM_E,
+        each operating a single cv2.VideoCapture camera.
+
+    By spawning 3 capturing threads, the runtime of 3 cameras have been completely decoupled.
+
+    Because there are 2 viewing modes - MICRO and ANBIENT - I created 2 processing threads...
+        for 2 different viewing modes.
+
+    The MICRO processing thread uses 2 capturing threads - CAM_R and CAM_L - for two eyes.
+
+    The AMBIENT processing thread uses 1 capturing thread - CAM_E - for both eyes.
+
+    The 3 capturing threads runs concurrently, so the 3 cameras are just constantly working.
+
+    The 2 processing threads are mutually exclusive, meaning that only one of them...
+        actively runs at any given moment, while the other is paused.
+
+    The 2 processing threads are basically "state pattern".
+    Both of them have identical set of methods like zoom_in, zoom_out... etc.
+
+
+
+--- Version 8.6 ---
 
     Automatic camera (right) tuning for correct lighting:
 
@@ -250,7 +282,7 @@
 '''
 
 if __name__ == '__main__':
-    from WinduModel import *
+    from windu_model import *
     app = QtGui.QApplication(sys.argv)
     core = WinduCore()
     sys.exit(app.exec_())
