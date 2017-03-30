@@ -1,5 +1,17 @@
 '''
---- This is version 9.1 ---
+--- This is version 9.2 ---
+
+    Create the class AbstractThread as the superclass of all threads.
+
+    The AbstractThread standardize runtime controls including start(), stop(), resume() and pause()...
+        as well as frame rate (fps) of the main loop.
+
+    This abstraction makes all threads become lighter and more focused on its own specific task...
+        reducing the hefty codes for runtime control.
+
+
+
+--- Version 9.1 ---
 
     Extract the VideoWriter from the process thread...
         and make it as an independent writer thread.

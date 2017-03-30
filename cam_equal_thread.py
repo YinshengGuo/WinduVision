@@ -1,9 +1,10 @@
 import numpy as np
 import cv2, time, sys, threading
+from abstract_thread import *
 
 
 
-class CamEqualThread(threading.Thread):
+class CamEqualThread(AbstractThread):
     '''
     This thread is associated with (and dependent on) the CaptureThread object.
 
@@ -11,7 +12,8 @@ class CamEqualThread(threading.Thread):
         and adjusts camera parameters via the CaptureThread object.
     '''
     def __init__(self, capture_thread_R, capture_thread_L, mediator):
-        super(CamEqualThread, self).__init__()
+
+        super(CamEqualThread, self).__init__(pause_at_start=True)
 
         # Mediator emits signal to the gui object
         self.mediator = mediator
@@ -19,75 +21,30 @@ class CamEqualThread(threading.Thread):
         self.capture_thread_R = capture_thread_R
         self.capture_thread_L = capture_thread_L
 
-        self.__init__signals()
-        self.__init__parms()
+        self.connect_signals(mediator = self.mediator,
+                             signal_names = ['camera_equalized'])
 
-    def __init__signals(self, connect=True):
-        '''
-        Call the mediator to connect signals to the gui.
-        These are the signals to be emitted dynamically during runtime.
+    def main(self):
 
-        Each signal is defined by a unique str signal name.
+        # --- Section of camera tuning --- #
+        result1 = self.tune_right_camera(iter=20)
 
-        The parameter 'connect' specifies whether connect or disconnect signals.
-        '''
-        signal_names = ['camera_equalized']
 
-        if connect:
-            self.mediator.connect_signals(signal_names)
-        else:
-            self.mediator.disconnect_signals(signal_names)
 
-    def __init__parms(self):
-        self.stopping = False
+        # --- Section of camera equalization --- #
+        self.copy_parameters()
+
+        result2 = self.tune_left_camera(iter=20)
+
+
+
+        # --- Showing results to GUI --- #
+        results = result1 + '\n' + result2 + '\n'
+
+        self.mediator.emit_signal(signal_name = 'camera_equalized',
+                                          arg = results           )
+
         self.pausing = True
-        self.isPaused = True
-
-    def run(self):
-
-        while not self.stopping:
-
-            # --- Section of runtime control --- #
-
-            # Pausing the loop (or not)
-            if self.pausing:
-                self.isPaused = True
-                time.sleep(0.1)
-                continue
-            else:
-                self.isPaused = False
-
-
-
-            # --- Section of camera tuning --- #
-
-            result1 = self.tune_right_camera(iter=20)
-
-
-
-            # --- Section of camera equalization --- #
-
-            self.copy_parameters()
-
-            result2 = self.tune_left_camera(iter=20)
-
-
-
-            # --- Showing results to GUI --- #
-
-            results = result1 + '\n' + result2 + '\n'
-
-            self.mediator.emit_signal(signal_name = 'camera_equalized',
-                                              arg = results           )
-
-            self.pausing = True
-
-
-
-        # --- Out of main loop, terminating the thread --- #
-
-        # Disconnect signals from the gui object when the thread is done
-        self.__init__signals(connect=False)
 
     def tune_right_camera(self, iter):
         '''
@@ -220,18 +177,5 @@ class CamEqualThread(threading.Thread):
         D = cols * 3 / 4
 
         return img[A:B, C:D, :]
-
-    def resume(self):
-
-        if self.pausing:
-            self.pausing = False
-
-    def stop(self):
-        '''
-        Called to terminate the thread.
-        '''
-
-        # Shut off main loop in self.run()
-        self.stopping = True
 
 

@@ -4,7 +4,7 @@ from OpenGL import GL
 
 from windu_view import *
 from windu_controller import *
-from windu_threads import *
+from all_threads import *
 from constants import *
 
 
@@ -15,29 +15,23 @@ class WinduCore(object):
         super(WinduCore, self).__init__()
 
         # Instantiate a controller object.
-        # Pass the core object into the controller object,
-        # so the controller can call the core.
+        # Pass the core object into the controller object, so the controller can call the core.
         self.controller = Controller(core = self)
 
         # Instantiate a gui object.
-        # Pass the controller object into the gui object,
-        # so the gui can call the controller, which in turn calls the core
+        # Pass the controller object into the gui object...
+        #     so the gui can call the controller, which in turn calls the core
         self.gui = WinduGUI(controller = self.controller)
         self.gui.show()
 
         # The mediator is a channel to emit any signal to the gui object.
-        # Pass the gui object into the mediator object,
-        # so the mediator knows where to emit the signal.
+        # Pass the gui object into the mediator object, so the mediator knows where to emit the signal.
         self.mediator = Mediator(self.gui)
 
         self.__init__signals(connect=True)
 
         # Start the video thread, also concurrent threads
         self.start_video_thread()
-
-        self.EqualizingCameras = False
-
-        self.__init__cmd()
 
     def __init__signals(self, connect=True):
         '''
@@ -54,12 +48,6 @@ class WinduCore(object):
             self.mediator.connect_signals(signal_names)
         else:
             self.mediator.disconnect_signals(signal_names)
-
-    def __init__cmd(self):
-        '''
-        Some high-level commands to be executed upon the software is initiated
-        '''
-        pass
 
     def start_video_thread(self):
 
@@ -137,10 +125,11 @@ class WinduCore(object):
     # Methods called by the controller object
 
     def snapshot(self, fname):
-        cv2.imwrite(fname, self.active_proc_thread.imgDisplay)
+        img = self.active_proc_thread.get_display_image()
+        cv2.imwrite(fname, img)
 
     def toggle_recording(self):
-        self.writer_thread.toggle_recording()
+        self.writer_thread.toggle()
 
     def toggle_auto_offset(self):
         self.align_thread.toggle()

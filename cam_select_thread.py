@@ -9,12 +9,8 @@ class CamSelectThread(threading.Thread):
 
         self.mediator = mediator
 
-        self.__init__parameters()
-
         self.__init__signals()
 
-    def __init__parameters(self):
-        self.current_id = 0
         self.isDone = False
 
     def __init__signals(self, connect=True):
@@ -38,12 +34,14 @@ class CamSelectThread(threading.Thread):
 
             self.isWaiting = True
 
-            self.cam = cv2.VideoCapture(id)
+            cap = cv2.VideoCapture(id)
 
-            if self.cam.isOpened():
-                _, img = self.cam.read()
+            if cap.isOpened():
+                ret, img = cap.read()
 
                 data = {'id': id, 'img': img}
+
+                cap.release()
 
                 self.mediator.emit_signal( signal_name = 'show_current_cam',
                                                    arg = data)
@@ -52,8 +50,6 @@ class CamSelectThread(threading.Thread):
 
             else:
                 print 'Camera id: {} not available'.format(id)
-
-            self.cam.release()
 
         self.mediator.emit_signal( signal_name = 'select_cam_done' )
 

@@ -1,10 +1,11 @@
 import numpy as np
 import cv2, time, sys, threading, json
 from constants import *
+from abstract_thread import *
 
 
 
-class ProcessThread(threading.Thread):
+class ProcessThread(AbstractThread):
 
     def __init__(self, capture_thread_R, capture_thread_L, mediator):
         super(ProcessThread, self).__init__()
@@ -15,24 +16,11 @@ class ProcessThread(threading.Thread):
         self.capture_thread_R = capture_thread_R
         self.capture_thread_L = capture_thread_L
 
-        self.__init__signals(connect=True)
         self.__init__parms()
 
-    def __init__signals(self, connect=True):
-        '''
-        Call the mediator to connect signals to the gui.
-        These are the signals to be emitted dynamically during runtime.
+        self.connect_signals(mediator, ['display_image', 'set_info_text'])
 
-        Each signal is defined by a unique str signal name.
-
-        The parameter 'connect' specifies whether connect or disconnect signals.
-        '''
-        signal_names = ['display_image', 'set_info_text']
-
-        if connect:
-            self.mediator.connect_signals(signal_names)
-        else:
-            self.mediator.disconnect_signals(signal_names)
+        self.set_fps(self.fps)
 
     def __init__parms(self):
         # Parameters for image processing
@@ -75,18 +63,15 @@ class ProcessThread(threading.Thread):
         display_height, display_width = self.display_height, self.display_width
 
         # The height-to-width ratio
-        h_w_ratio_img = float(img_height) / img_width
-        h_w_ratio_display = float(display_height) / (display_width / 2)
+        ratio_img = float(img_height) / img_width
+        ratio_display = float(display_height) / (display_width / 2)
 
         # The base scale factor is the ratio of display size / image size,
         #     which scales the image to the size of the display.
-
-        if h_w_ratio_img > h_w_ratio_display:
-            base_scale = float(display_height) / img_height
+        if ratio_img > ratio_display:
+            base_scale = float(display_height) / img_height # Height is the limiting factor
         else:
-            base_scale = float(display_width/2) / img_width
-
-
+            base_scale = float(display_width/2) / img_width # Width is the limiting factor
 
         # The actual scale factor is the product of the base scale factor and the zoom factor.
         scale_x = base_scale * self.zoom
@@ -129,7 +114,7 @@ class ProcessThread(threading.Thread):
         self.imgL_proc  = np.zeros((rows, cols/2, 3), np.uint8)
         self.img_display = np.zeros((rows, cols  , 3), np.uint8)
 
-    def run(self):
+    def main(self):
         '''
         There are three major steps for the image processing pipeline,
         with some additional steps in between.
@@ -141,76 +126,42 @@ class ProcessThread(threading.Thread):
         (3) Combine images.
         '''
 
-        t0 = time.clock()
+        # Get the images from self.capture_thread
+        self.imgR_0 = self.capture_thread_R.get_image() # The suffix '_0' means raw input image
+        self.imgL_0 = self.capture_thread_L.get_image()
 
-        while not self.stopping:
+        # Quick check on the image dimensions
+        # If not matching, skip all following steps
+        if not self.imgR_0.shape == self.imgL_0.shape:
+            self.mediator.emit_signal( signal_name = 'set_info_text',
+                                       arg = 'Image dimensions not identical.' )
+            time.sleep(0.1)
+            return
 
-            # Pausing the loop (or not)
-            if self.pausing:
-                self.isPaused = True
-                time.sleep(0.1)
-                continue
-            else:
-                self.isPaused = False
+        # (1) Eliminate offset of the left image.
+        # (2) Resize and translate to place each image at the center of both sides of the view.
+        rows, cols = self.display_height, self.display_width / 2 # Output image dimension
 
+        self.imgR_1 = cv2.warpAffine(self.imgR_0, self.resize_matrix_R, (cols, rows))
+        self.imgL_1 = cv2.warpAffine(self.imgL_0, self.resize_matrix_L, (cols, rows))
 
+        # Update processed images for external access
+        self.imgR_proc[:,:,:] = self.imgR_1[:,:,:]
+        self.imgL_proc[:,:,:] = self.imgL_1[:,:,:]
 
-            # Get the images from self.capture_thread
-            self.imgR_0 = self.capture_thread_R.get_image() # The suffix '_0' means raw input image
-            self.imgL_0 = self.capture_thread_L.get_image()
+        # Compute stereo depth map (optional)
+        if self.computingDepth:
+            self.imgL_1 = self.compute_depth(self.imgR_1, self.imgL_1)
 
-            # Quick check on the image dimensions
-            # If not matching, skip and continue
-            if not self.imgR_0.shape == self.imgL_0.shape:
-                self.mediator.emit_signal( signal_name = 'set_info_text',
-                                           arg = 'Image dimensions not identical.' )
-                time.sleep(0.1)
-                continue
+        # (3) Combine images.
+        h, w = self.display_height, self.display_width
+        self.img_display[:, 0:(w/2), :] = self.imgL_1
+        self.img_display[:, (w/2):w, :] = self.imgR_1
 
+        self.mediator.emit_signal( signal_name = 'display_image',
+                                   arg = self.img_display )
 
-
-            # (1) Eliminate offset of the left image.
-            # (2) Resize and translate to place each image at the center of both sides of the view.
-            rows, cols = self.display_height, self.display_width / 2 # Output image dimension
-
-            self.imgR_1 = cv2.warpAffine(self.imgR_0, self.resize_matrix_R, (cols, rows))
-            self.imgL_1 = cv2.warpAffine(self.imgL_0, self.resize_matrix_L, (cols, rows))
-
-            # Update processed images for external access
-            self.imgR_proc[:,:,:] = self.imgR_1[:,:,:]
-            self.imgL_proc[:,:,:] = self.imgL_1[:,:,:]
-
-
-
-            # Compute stereo depth map (optional)
-            if self.computingDepth:
-                self.imgL_1 = self.compute_depth(self.imgR_1, self.imgL_1)
-
-
-
-            # (3) Combine images.
-            h, w = self.display_height, self.display_width
-            self.img_display[:, 0:(w/2), :] = self.imgL_1
-            self.img_display[:, (w/2):w, :] = self.imgR_1
-
-            self.mediator.emit_signal( signal_name = 'display_image',
-                                       arg = self.img_display )
-
-            self.emit_fps_info()
-
-
-
-            # Time the loop
-            while (time.clock() - t0) < (1./self.fps):
-                # Sleeping for < 15 ms is not reliable across different platforms.
-                # Windows PCs generally have a minimum sleeping time > ~15 ms...
-                #     making this timer exceeding the specified period.
-                time.sleep(0.001)
-
-            t0 = time.clock()
-
-        # Disconnect signals from the gui object when the thread is done
-        self.__init__signals(connect=False)
+        self.emit_fps_info()
 
     def compute_depth(self, imgR, imgL):
         # Convert to gray scale
@@ -306,26 +257,6 @@ class ProcessThread(threading.Thread):
         if self.zoom / 1.01 > 0.5:
             self.zoom = self.zoom / 1.01
             self.set_resize_matrix()
-
-    def pause(self):
-        self.pausing = True
-        # Wait until the main loop is really paused before completing this method call
-        while not self.isPaused:
-            time.sleep(0.1)
-        return
-
-    def resume(self):
-        self.pausing = False
-        # Wait until the main loop is really resumed before completing this method call
-        while self.isPaused:
-            time.sleep(0.1)
-        return
-
-    def stop(self):
-        'Called to terminate the video thread.'
-
-        # Shut off main loop in self.run()
-        self.stopping = True
 
     def apply_depth_parameters(self, parameters):
 

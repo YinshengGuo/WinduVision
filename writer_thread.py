@@ -1,42 +1,28 @@
 import numpy as np
 import cv2, time, sys, threading, os
+from abstract_thread import *
 
 
 
-class WriterThread(threading.Thread):
+class WriterThread(AbstractThread):
 
     def __init__(self, process_thread, mediator):
-        super(WriterThread, self).__init__()
+        super(WriterThread, self).__init__(pause_at_start=True)
 
         self.process_thread = process_thread
         self.mediator = mediator
 
-        self.__init__signals()
         self.__init__parameters()
 
-    def __init__signals(self, connect=True):
-        '''
-        Call the mediator to connect signals to the gui.
-        These are the signals to be emitted dynamically during runtime.
+        self.set_fps(30)
 
-        Each signal is defined by a unique str signal name.
+        self.connect_signals(mediator = self.mediator,
+                             signal_names = ['recording_starts', 'recording_ends'])
 
-        The parameter 'connect' specifies whether connect or disconnect signals.
-        '''
-        signal_names = ['recording_starts', 'recording_ends']
-
-        if connect:
-            self.mediator.connect_signals(signal_names)
-        else:
-            self.mediator.disconnect_signals(signal_names)
+        self.writer = None
 
     def __init__parameters(self):
 
-        self.stopping = False
-        self.pausing = True
-        self.isPaused = True
-
-        self.fps = 30.0
         self.temp_video_fname = 'temp.avi'
 
         # Some of the available codecs on native Windows PC: 'DIB ', 'I420', 'IYUV'...
@@ -47,65 +33,13 @@ class WriterThread(threading.Thread):
         img = self.process_thread.get_display_image()
         self.img_height, self.img_width, _ = img.shape
 
-    def run(self):
+    def main(self):
 
-        t0 = time.clock()
-
-        while not self.stopping:
-
-            # Pausing the loop (or not)
-            if self.pausing:
-                self.isPaused = True
-                time.sleep(0.1)
-                continue
-            else:
-                self.isPaused = False
-
+        if self.writer:
             img = self.process_thread.get_display_image()
             self.writer.write(img)
 
-            # Time the loop
-            while (time.clock() - t0) < (1./self.fps):
-                # Sleeping for < 15 ms is not reliable across different platforms.
-                # Windows PCs generally have a minimum sleeping time > ~15 ms...
-                #     making this timer exceeding the specified period.
-                time.sleep(0.001)
-
-            t0 = time.clock()
-
-        # Disconnect signals from the gui object when the thread is done
-        self.__init__signals(connect=False)
-
-    def toggle_recording(self):
-
-        if self.isPaused:
-            self.resume()
-        else:
-            self.pause(save_file=True)
-
-    def pause(self, save_file):
-
-        if self.isPaused:
-            return
-
-        self.pausing = True
-        # Wait until the main loop is really paused before completing this method call
-        while not self.isPaused:
-            time.sleep(0.1)
-
-        self.writer.release()
-
-        if save_file:
-            # Signal gui to change the icon of the button...
-            #     and let the user to rename the temp file
-            self.mediator.emit_signal('recording_ends', arg=self.temp_video_fname)
-        else:
-            os.remove(self.temp_video_fname)
-
-    def resume(self):
-
-        if not self.isPaused:
-            return
+    def before_resuming(self):
 
         # Create VideoWriter object
         self.writer = cv2.VideoWriter(self.temp_video_fname,
@@ -114,28 +48,33 @@ class WriterThread(threading.Thread):
                                       (self.img_width, self.img_height))
 
         if not self.writer.isOpened():
+            self.writer = None
             print 'Video writer could not be opened.'
-            return
-
-        self.pausing = False
-        # Wait until the main loop is really resumed before completing this method call
-        while self.isPaused:
-            time.sleep(0.1)
+            return False
 
         # Change the icon of the gui button
         self.mediator.emit_signal('recording_starts')
+        return True
 
-    def stop(self):
-        '''
-        Called to terminate the thread.
-        '''
+    def after_paused(self):
 
-        # Pause without saving the file
-        self.pause(save_file=False)
+        self.writer.release()
+        self.writer = None
 
-        # Shut off main loop in self.run()
-        self.stopping = True
+        # Signal gui to change the icon of the button...
+        #     and let the user to rename the temp file
+        self.mediator.emit_signal('recording_ends', arg=self.temp_video_fname)
+        return True
+
+    def after_stopped(self):
+
+        if not self.isPaused:
+            self.writer.release()
+            os.remove(self.temp_video_fname)
+
+        return True
 
     def set_process_thread(self, thread):
         self.process_thread = thread
+
 

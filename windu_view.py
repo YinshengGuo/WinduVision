@@ -377,16 +377,17 @@ class WinduGUI(QtGui.QMainWindow):
         # Set the QLabel to display the QPixmap
         canvas.setPixmap(Q_pixmap)
 
-        which_cam = self.specify_right_left_cam()
-
-        data = {'id': id, 'which_cam': which_cam}
+        which_cam = self.specify_which_cam()
 
         widget.close()
 
-        self.controller.call_method( method_name = 'save_cam_id', arg = data )
+        if not which_cam is None:
+            data = {'id': id, 'which_cam': which_cam}
+            self.controller.call_method( method_name = 'save_cam_id', arg = data )
+
         self.controller.call_method( method_name = 'next_cam')
 
-    def specify_right_left_cam(self):
+    def specify_which_cam(self):
 
         m = QtGui.QMessageBox()
         m.setWindowIcon(QtGui.QIcon('icons/windu_vision.png'))
@@ -394,17 +395,16 @@ class WinduGUI(QtGui.QMainWindow):
         m.setIcon(QtGui.QMessageBox.Question)
         m.setText('Is this the right or left camera?')
         m.addButton(QtGui.QPushButton('Left'), QtGui.QMessageBox.YesRole)
-        m.addButton(QtGui.QPushButton('Right'), QtGui.QMessageBox.NoRole)
-        m.addButton(QtGui.QPushButton('None'), QtGui.QMessageBox.RejectRole)
+        m.addButton(QtGui.QPushButton('Right'), QtGui.QMessageBox.YesRole)
+        m.addButton(QtGui.QPushButton('Ambient'), QtGui.QMessageBox.YesRole)
+        m.addButton(QtGui.QPushButton('None'), QtGui.QMessageBox.YesRole)
 
         reply = m.exec_()
 
-        if reply == 0:
-            return CAM_L
-        elif reply == 1:
-            return CAM_R
-        else:
-            return None
+        if reply == 0: return CAM_L
+        elif reply == 1: return CAM_R
+        elif reply == 2: return CAM_E
+        else: return None
 
     def select_cam_done(self):
         self.controller.call_method(method_name = 'start_video_thread')

@@ -1,10 +1,11 @@
 import numpy as np
 import cv2, time, sys, threading, json
 from constants import *
+from abstract_thread import *
 
 
 
-class CaptureThread(threading.Thread):
+class CaptureThread(AbstractThread):
 
     def __init__(self, which_cam):
         '''
@@ -14,59 +15,20 @@ class CaptureThread(threading.Thread):
 
         self.which_cam = which_cam
 
-        self.__init__parms()
-
         # The customized single-camera object is...
         #     a low-level object of the CaptureThread object
         self.cam = SingleCamera(which_cam)
         self.img = self.cam.read()
 
-    def __init__parms(self):
-        # Parameters for looping, control and timing
-        self.stopping = False
-        self.pausing = False
-        self.isPaused = False
+    def main(self):
 
-    def run(self):
+        # Read the images from the cameras
+        self.img = self.cam.read()
 
-        # The main loop of this CaptureThread is NOT timed
-        # It runs at the rate determined by a single camera hardware
-        while not self.stopping:
-
-            # Pausing the loop (or not)
-            if self.pausing:
-                self.isPaused = True
-                time.sleep(0.1)
-                continue
-            else:
-                self.isPaused = False
-
-            # Read the images from the cameras
-            self.img = self.cam.read()
-            # print self.which_cam
-
+    def after_stopped(self):
         # Close camera hardware when the image-capturing main loop is done.
         self.cam.close()
-
-    def pause(self):
-        self.pausing = True
-        # Wait until the main loop is really paused before completing this method call
-        while not self.isPaused:
-            time.sleep(0.1)
-        return
-
-    def resume(self):
-        self.pausing = False
-        # Wait until the main loop is really resumed before completing this method call
-        while self.isPaused:
-            time.sleep(0.1)
-        return
-
-    def stop(self):
-        'Called to terminate the video thread.'
-
-        # Shut off main loop in self.run()
-        self.stopping = True
+        return True
 
     def set_camera_parameters(self, parameters):
 
@@ -164,8 +126,13 @@ class SingleCamera(object):
         '''Return the properly rotated image. If cv2_cam is None than return a blank image.'''
 
         if not self.cap is None:
-            ret, img = self.cap.read()
-            img = np.rot90(img, self.rotation)
+            try:
+                ret, img = self.cap.read()
+                img = np.rot90(img, self.rotation)
+            except:
+                img = self.img_blank
+                time.sleep(0.01)
+
         else:
             # Must insert a time delay to emulate camera harware delay
             # Otherwise the program will crash due to full-speed looping
