@@ -1,5 +1,19 @@
 '''
---- This is version 9.2 ---
+--- This is version 9.3 ---
+
+    Resolved the issue of camera conflict while stopping capture threads.
+    The problem was: When two capture threads use the same camera...
+        and when one of the threads closes its own camera, the other thread is still using the same camera...
+        therefore causing errors.
+
+    The approach to resolve the conflict issue is by drawing camera objects up to a higher level.
+    I instantiated all cameras in the windu_model.
+
+    When stopping video, stop all capture threads before closing any camera.
+
+
+
+--- Version 9.2 ---
 
     Create the class AbstractThread as the superclass of all threads.
 

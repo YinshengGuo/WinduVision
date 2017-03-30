@@ -5,6 +5,7 @@ from OpenGL import GL
 from windu_view import *
 from windu_controller import *
 from all_threads import *
+from single_camera import *
 from constants import *
 
 
@@ -51,10 +52,17 @@ class WinduCore(object):
 
     def start_video_thread(self):
 
-        #------ 3 capture threads for 3 cameras ------#
+        #------ 3 cameras ------#
+        self.cams = {}
+        for key in [CAM_R, CAM_L, CAM_E]:
+            self.cams[key] = SingleCamera(which_cam=key)
+
+
+
+        #------ 3 capture threads ------#
         self.cap_threads = {}
         for key in [CAM_R, CAM_L, CAM_E]:
-            self.cap_threads[key] = CaptureThread(which_cam=key)
+            self.cap_threads[key] = CaptureThread(camera = self.cams[key])
             self.cap_threads[key].start()
 
 
@@ -109,11 +117,14 @@ class WinduCore(object):
         self.writer_thread.stop()
         self.cam_equal_thread.stop()
 
-        for k, t in self.proc_threads.items():
-            t.stop()
+        for thread in self.proc_threads.values():
+            thread.stop()
 
-        for k, t in self.cap_threads.items():
-            t.stop()
+        for thread in self.cap_threads.values():
+            thread.stop()
+
+        for cam in self.cams.values():
+            cam.close()
 
     def close(self):
         'Should be called upon software termination.'

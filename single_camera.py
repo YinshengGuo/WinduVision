@@ -4,16 +4,16 @@ from constants import *
 
 
 
-class SingletonCamera(object):
+class SingleCamera(object):
     '''
-    A singleton camera object that directly operates all physical cameras through cv2.VideoCapture().
+    A customized camera API that directly operates one physical camera through cv2.VideoCapture().
     '''
 
-    def __init__(self, keys):
+    def __init__(self, which_cam):
         '''
-        keys: a list of camera keys (CAM_R, CAM_L or CAM_E)
+        key: camera key among the constants (CAM_R, CAM_L or CAM_E)
         '''
-        super(SingletonCamera, self).__init__()
+        super(SingleCamera, self).__init__()
 
         self.which_cam = which_cam
 

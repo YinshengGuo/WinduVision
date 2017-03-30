@@ -12,7 +12,7 @@ class WinduGUI(QtGui.QMainWindow):
         super(WinduGUI, self).__init__()
         self.controller = controller
 
-        self.__init__gui_parameters()
+        self.__init__parameters()
 
         self.setWindowTitle('Windu Vision')
         self.setWindowIcon(QtGui.QIcon('icons/windu_vision.png'))
@@ -47,16 +47,18 @@ class WinduGUI(QtGui.QMainWindow):
         self.__init__toolbtns()
         self.__init__key_shortcut()
 
-    def __init__gui_parameters(self):
+    def __init__parameters(self):
         '''
         Load gui parameters from the /parameters/gui.json file
         '''
 
-        fh = open('parameters/gui.json', 'r')
-        gui_parameters = json.loads(fh.read())
+        with open('parameters/gui.json', 'r') as fh:
+            gui_parameters = json.loads(fh.read())
 
         for name, value in gui_parameters.items():
             setattr(self, name, value)
+
+        self.isDeveloper = False
 
     def __init__toolbtns(self):
         # Each action has a unique key and a name
@@ -64,8 +66,8 @@ class WinduGUI(QtGui.QMainWindow):
         # name = text of the action/button
 
         #    (    keys               ,   names                         , for_developer , connect_to_core )
-        K = [('snapshot'             , 'Snapshot'                      ,    False      ,      False      ),
-             ('toggle_recording'     , 'Record Video'                  ,    False      ,      True       ),
+        K = [('snapshot'             , 'Snapshot (Ctrl+S)'             ,    False      ,      False      ),
+             ('toggle_recording'     , 'Record Video (Ctrl+R)'         ,    False      ,      True       ),
              ('toggle_auto_offset'   , 'Start Auto-alignment'          ,    True       ,      True       ),
              ('open_info'            , 'Show Real-time Info'           ,    True       ,      False      ),
              ('open_gl_window'       , 'Open 3D Viewer'                ,    True       ,      False      ),
@@ -73,9 +75,9 @@ class WinduGUI(QtGui.QMainWindow):
              ('open_depth_tuner'     , 'Adjust Stereo Depth Parameters',    True       ,      False      ),
              ('start_select_cam'     , 'Select Cameras'                ,    False      ,      True       ),
              ('open_camera_tuner'    , 'Adjust Camera Parameters'      ,    False      ,      False      ),
-             ('equalize_cameras'     , 'Equalize Cameras'              ,    False      ,      True       ),
-             ('toggle_fullscreen'    , 'Show Fullscreen'               ,    False      ,      False      ),
-             ('toggle_view_mode'     , 'Switch View'                   ,    False      ,      True       )]
+             ('equalize_cameras'     , 'Equalize Cameras (Ctrl+E)'     ,    False      ,      True       ),
+             ('toggle_fullscreen'    , 'Show Fullscreen (Ctrl+F)'      ,    False      ,      False      ),
+             ('toggle_view_mode'     , 'Switch View Mode (Ctrl+V)'     ,    False      ,      True       )]
 
         self.actions = {}
         self.toolbtns = {}
@@ -115,16 +117,24 @@ class WinduGUI(QtGui.QMainWindow):
                     print exception_inst
 
     def __init__key_shortcut(self):
-        QtGui.QShortcut(QtGui.QKeySequence('Ctrl+F'), self, self.toggle_fullscreen)
-        QtGui.QShortcut(QtGui.QKeySequence('Shift+Ctrl+D'), self, self.toggle_developer)
-        QtGui.QShortcut(QtGui.QKeySequence('Esc'), self, self.esc_key)
+        # For key combinations that need to be connected to the self gui object
+        #    ( method_name         , key combination )
+        K = [('toggle_fullscreen'  , 'Ctrl+F'        ),
+             ('snapshot'           , 'Ctrl+S'        ),
+             ('toggle_developer'   , 'Shift+Ctrl+D'  ),
+             ('esc_key'            , 'Esc'           )]
+
+        for method_name, key_comb in K:
+            method = getattr(self, method_name)
+            QtGui.QShortcut(QtGui.QKeySequence(key_comb), self, method)
+
+
 
         # For key combinations that need to be connected to the core object
         #    ( method_name         , key combination )
-        K = [('snapshot'           , 'Ctrl+S'        ),
-             ('toggle_recording'   , 'Ctrl+R'        ),
-             ('toggle_auto_offset' , 'Ctrl+A'        ),
-             ('equalize_cameras'   , 'Ctrl+E'        )]
+        K = [('toggle_recording'   , 'Ctrl+R'        ),
+             ('equalize_cameras'   , 'Ctrl+E'        ),
+             ('toggle_view_mode'   , 'Ctrl+V'        )]
 
         for method_name, key_comb in K:
             method = self.controller.get_method(method_name)
