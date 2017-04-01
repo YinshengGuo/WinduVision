@@ -7,20 +7,17 @@ from abstract_thread import *
 
 class ProcessThread(AbstractThread):
 
-    def __init__(self, capture_thread_R, capture_thread_L, mediator):
+    def __init__(self, cap_thread_R, cap_thread_L, mediator):
         super(ProcessThread, self).__init__()
 
-        # Mediator emits signal to the gui object
+        self.cap_thread_R = cap_thread_R
+        self.cap_thread_L = cap_thread_L
         self.mediator = mediator
 
-        self.capture_thread_R = capture_thread_R
-        self.capture_thread_L = capture_thread_L
-
         self.__init__parms()
+        self.set_fps(30.0)
 
         self.connect_signals(mediator, ['display_image', 'set_info_text'])
-
-        self.set_fps(self.fps)
 
     def __init__parms(self):
         # Parameters for image processing
@@ -43,13 +40,9 @@ class ProcessThread(AbstractThread):
 
 
 
-        # Parameters for looping, control and timing
-        self.stopping = False
-        self.pausing = False
-        self.isPaused = False
+        # Parameters for control and timing
         self.computingDepth = False
         self.t_series = [time.time() for i in range(30)]
-        self.fps = 30.0
 
     def set_resize_matrix(self):
         '''
@@ -57,7 +50,7 @@ class ProcessThread(AbstractThread):
         Also define the dimension of self.img_display, which is the terminal image to be displayed in the GUI.
         '''
 
-        img = self.capture_thread_R.get_image()
+        img = self.cap_thread_R.get_image()
         img_height, img_width, _ = img.shape
 
         display_height, display_width = self.display_height, self.display_width
@@ -127,8 +120,8 @@ class ProcessThread(AbstractThread):
         '''
 
         # Get the images from self.capture_thread
-        self.imgR_0 = self.capture_thread_R.get_image() # The suffix '_0' means raw input image
-        self.imgL_0 = self.capture_thread_L.get_image()
+        self.imgR_0 = self.cap_thread_R.get_image() # The suffix '_0' means raw input image
+        self.imgL_0 = self.cap_thread_L.get_image()
 
         # Quick check on the image dimensions
         # If not matching, skip all following steps
@@ -217,8 +210,8 @@ class ProcessThread(AbstractThread):
         2) Use correlation function to calculate the offset.
         '''
 
-        imgR = self.capture_thread_R.get_image()
-        imgL = self.capture_thread_L.get_image()
+        imgR = self.cap_thread_R.get_image()
+        imgL = self.cap_thread_L.get_image()
 
         imgR = cv2.cvtColor(imgR, cv2.COLOR_BGR2GRAY)
         imgL = cv2.cvtColor(imgL, cv2.COLOR_BGR2GRAY)

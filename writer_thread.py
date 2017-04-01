@@ -7,7 +7,7 @@ from abstract_thread import *
 class WriterThread(AbstractThread):
 
     def __init__(self, process_thread, mediator):
-        super(WriterThread, self).__init__(pause_at_start=True)
+        super(WriterThread, self).__init__()
 
         self.process_thread = process_thread
         self.mediator = mediator

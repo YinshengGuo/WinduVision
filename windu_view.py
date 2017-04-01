@@ -75,7 +75,7 @@ class WinduGUI(QtGui.QMainWindow):
              ('open_depth_tuner'     , 'Adjust Stereo Depth Parameters',    True       ,      False      ),
              ('start_select_cam'     , 'Select Cameras'                ,    False      ,      True       ),
              ('open_camera_tuner'    , 'Adjust Camera Parameters'      ,    False      ,      False      ),
-             ('equalize_cameras'     , 'Equalize Cameras (Ctrl+E)'     ,    False      ,      True       ),
+             ('toggle_auto_cam'      , 'Camera Auto Mode'              ,    False      ,      True       ),
              ('toggle_fullscreen'    , 'Show Fullscreen (Ctrl+F)'      ,    False      ,      False      ),
              ('toggle_view_mode'     , 'Switch View Mode (Ctrl+V)'     ,    False      ,      True       )]
 
@@ -133,7 +133,6 @@ class WinduGUI(QtGui.QMainWindow):
         # For key combinations that need to be connected to the core object
         #    ( method_name         , key combination )
         K = [('toggle_recording'   , 'Ctrl+R'        ),
-             ('equalize_cameras'   , 'Ctrl+E'        ),
              ('toggle_view_mode'   , 'Ctrl+V'        )]
 
         for method_name, key_comb in K:
@@ -316,7 +315,7 @@ class WinduGUI(QtGui.QMainWindow):
 
     def recording_starts(self):
         self.actions['toggle_recording'].setIcon(QtGui.QIcon('icons/stop_recording.png'))
-        self.actions['toggle_recording'].setText('Stop')
+        self.actions['toggle_recording'].setText('Stop (Ctrl+R)')
 
     def recording_ends(self, temp_filename):
         self.actions['toggle_recording'].setIcon(QtGui.QIcon('icons/toggle_recording.png'))
@@ -346,6 +345,14 @@ class WinduGUI(QtGui.QMainWindow):
     def auto_offset_paused(self):
         self.actions['toggle_auto_offset'].setIcon(QtGui.QIcon('icons/toggle_auto_offset.png'))
         self.actions['toggle_auto_offset'].setText('Start Auto-alignment')
+
+    def auto_cam_resumed(self):
+        self.actions['toggle_auto_cam'].setIcon(QtGui.QIcon('icons/pause_auto_cam.png'))
+        self.actions['toggle_auto_cam'].setText('Stop Camera Auto Mode')
+
+    def auto_cam_paused(self):
+        self.actions['toggle_auto_cam'].setIcon(QtGui.QIcon('icons/toggle_auto_cam.png'))
+        self.actions['toggle_auto_cam'].setText('Camera Auto Mode')
 
     def set_info_text(self, text):
         self.info_window.setText(text)
@@ -418,19 +425,6 @@ class WinduGUI(QtGui.QMainWindow):
 
     def select_cam_done(self):
         self.controller.call_method(method_name = 'start_video_thread')
-
-    def camera_equalized(self, note):
-
-        print note
-
-        m = QtGui.QMessageBox()
-        m.setWindowIcon(QtGui.QIcon('icons/windu_vision.png'))
-        m.setWindowTitle('Windu Vision')
-        m.setIcon(QtGui.QMessageBox.Information)
-        m.setText('Camera equalized')
-        m.addButton(QtGui.QPushButton('OK'), QtGui.QMessageBox.YesRole)
-
-        m.exec_()
 
 
 

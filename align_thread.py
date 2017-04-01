@@ -18,11 +18,13 @@ class AlignThread(AbstractThread):
         self.connect_signals(mediator = self.mediator,
                              signal_names = ['auto_offset_resumed', 'auto_offset_paused'])
 
-        self.mediator.emit_signal('auto_offset_resumed')
-
         # Construct a queue of offset values
         self.X = np.zeros((10, ), np.float)
         self.Y = np.zeros((10, ), np.float)
+
+        self.pausing = False
+        self.isPaused = False
+        self.mediator.emit_signal('auto_offset_resumed')
 
     def main(self):
 
@@ -57,6 +59,7 @@ class AlignThread(AbstractThread):
         return True
 
     def after_paused(self):
+        self.process_thread.set_offset(0, 0)
         self.mediator.emit_signal('auto_offset_paused')
         return True
 

@@ -7,16 +7,22 @@ class AbstractThread(threading.Thread):
     __metaclass__ = abc.ABCMeta
 
     @abc.abstractmethod
-    def __init__(self, pause_at_start=False):
+    def __init__(self):
         super(AbstractThread, self).__init__()
 
         self.stopping = False
         self.isStopped = False
-        self.pausing = pause_at_start
-        self.isPaused = pause_at_start
 
-        self.dt = 0.1 # Dwelling time for an iteration of empty loops
-        self.fps = 0 # Not timing the main loop
+        # The default initiation state is paused
+        # Therefore when the self.start() method is invoked...
+        #     the main loop does not do the self.main() method.
+        # The reason of this additional layer of control is to let...
+        #     higher-level classes decide whether to do the main() task or not.
+        self.pausing = True
+        self.isPaused = True
+
+        self.dt = 0.01 # Dwelling time for an iteration of empty loops
+        self.fps = 0 # No timing the main loop
 
         self.signal_names = None
         self.mediator = None
@@ -48,7 +54,6 @@ class AbstractThread(threading.Thread):
     def run(self):
 
         t0 = time.clock()
-
         while not self.stopping:
 
             # Pausing the loop (or not)
@@ -59,8 +64,11 @@ class AbstractThread(threading.Thread):
             else:
                 self.isPaused = False
 
+            # The very main task the thread is doing which...
+            #     must be defined in subclasses.
             self.main()
 
+            # Skip the timing part if self.fps == 0
             if self.fps == 0:
                 continue
 
@@ -70,7 +78,6 @@ class AbstractThread(threading.Thread):
                 # Windows PCs generally have a minimum sleeping time > ~15 ms...
                 #     making this timer exceeding the specified period.
                 time.sleep(0.001)
-
             t0 = time.clock()
 
         self.disconnect_signals()
@@ -83,6 +90,7 @@ class AbstractThread(threading.Thread):
             self.pause()
 
     def before_resuming(self):
+        'This method must return True/False'
         return True
 
     def resume(self):
@@ -93,7 +101,8 @@ class AbstractThread(threading.Thread):
                 return
 
             self.pausing = False
-            # Wait until the main loop is really resumed before completing this method call
+            # Wait until the main loop is really resumed before completing this method call.
+            # Just to make sure it's really resumed to avoid any downstream conflict.
             while self.isPaused:
                 time.sleep(self.dt)
 
@@ -109,6 +118,7 @@ class AbstractThread(threading.Thread):
                 print 'The method after_paused() returns False. Not properly paused.'
 
     def after_paused(self):
+        'This method must return True/False'
         return True
 
     def stop(self):
@@ -128,6 +138,7 @@ class AbstractThread(threading.Thread):
             print 'The method after_stopped() returns False. Thread not properly terminated.'
 
     def after_stopped(self):
+        'This method must return True/False'
         return True
 
     def set_fps(self, fps):

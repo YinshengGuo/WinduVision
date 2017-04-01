@@ -14,7 +14,6 @@ class CaptureThread(AbstractThread):
         super(CaptureThread, self).__init__()
 
         self.cam = camera
-
         self.img = self.cam.read()
 
     def main(self):

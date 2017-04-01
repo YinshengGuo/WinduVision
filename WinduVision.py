@@ -1,5 +1,37 @@
 '''
---- This is version 9.3 ---
+--- This is version 9.4 ---
+
+    Replace the one-shot camera equalization with...
+        continuous fully automatic camera adjustment...
+        which is carried out by two threads:
+
+        (1) CameraTuneThread:
+            Automatically adjust gain and exposure of the currently active right camera
+
+        (2) CameraEqualThread:
+            Automatically adjust gain of the active left camera to match...
+            the average intensity of the active right camera.
+
+    The runtime control of switching on/off auto-camera is similar to...
+        video recording and image alignment.
+
+    ---
+
+    Another major change: The runtime control of all threads in the WinduCore class.
+
+    All threads by default is started in a "paused" mode, as defined in the superclass AbstractThread.
+
+    The higher-level object windu_core decides whether each thread is activated (i.e. resumed)
+        during runtime.
+
+    There was significant refactoring of the code in WinduCore class...
+        such that the execution flow of starting video threads is more structured.
+
+    Capture threads not working for the current view (MICRO or AMBIENT) is paused to spare CPU load.
+
+
+
+--- Version 9.3 ---
 
     Resolved the issue of camera conflict while stopping capture threads.
     The problem was: When two capture threads use the same camera...
