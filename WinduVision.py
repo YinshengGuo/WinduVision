@@ -1,5 +1,18 @@
 '''
---- This is version 9.4 ---
+--- This is version 9.5 ---
+
+    Separate set_display_size from set_resize_matrix in the ProcessThread class.
+    This fixes the blinking issue when zooming, as...
+        every time when zooming the imgDisplay is not reset to zero blank image...
+        as it was done in the set_resize_matrix method.
+
+    Fixed the full-screen bug. Both process threads now change display size.
+
+    Gactor out the stereo-reconstruction codes to make the main trunk lighter.
+
+
+
+--- Version 9.4 ---
 
     Replace the one-shot camera equalization with...
         continuous fully automatic camera adjustment...

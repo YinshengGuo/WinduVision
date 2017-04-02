@@ -2,7 +2,7 @@ import numpy as np
 import cv2, time, sys, threading, json
 from constants import *
 from abstract_thread import *
-
+from stereo import Stereo as stereo
 
 
 class ProcessThread(AbstractThread):
@@ -27,8 +27,9 @@ class ProcessThread(AbstractThread):
 
         with open('parameters/gui.json', 'r') as fh:
             gui_parms = json.loads(fh.read())
-        self.display_width = gui_parms['default_width']
-        self.display_height = gui_parms['default_height']
+        w = gui_parms['default_width']
+        h = gui_parms['default_height']
+        self.set_display_size(w, h)
 
         self.set_resize_matrix()
 
@@ -44,10 +45,26 @@ class ProcessThread(AbstractThread):
         self.computingDepth = False
         self.t_series = [time.time() for i in range(30)]
 
+    def set_display_size(self, width, height):
+        '''
+        Define the dimension of self.img_display, which is the terminal image to be displayed in the GUI.
+        '''
+
+        self.display_width = width
+        self.display_height = height
+
+        # Define the dimensions of:
+        #     self.imgR_proc  --- processed R image to be accessed externally
+        #     self.imgL_proc  ---           L image
+        #     self.img_display --- display image to be emitted to the GUI object
+        rows, cols = height, width
+        self.imgR_proc   = np.zeros((rows, cols/2, 3), np.uint8)
+        self.imgL_proc   = np.zeros((rows, cols/2, 3), np.uint8)
+        self.img_display = np.zeros((rows, cols  , 3), np.uint8)
+
     def set_resize_matrix(self):
         '''
         Define the transformation matrix for the image processing pipeline.
-        Also define the dimension of self.img_display, which is the terminal image to be displayed in the GUI.
         '''
 
         img = self.cap_thread_R.get_image()
@@ -96,17 +113,6 @@ class ProcessThread(AbstractThread):
         self.resize_matrix_L = np.float32([ [Sx, 0 , Sx*Off_x + tx] ,
                                             [0 , Sy, Sy*Off_y + ty] ])
 
-
-
-        # Define the dimensions of:
-        #     self.imgR_proc  --- processed R image to be accessed externally
-        #     self.imgL_proc  ---           L image
-        #     self.img_display --- display image to be emitted to the GUI object
-        rows, cols = self.display_height, self.display_width
-        self.imgR_proc  = np.zeros((rows, cols/2, 3), np.uint8)
-        self.imgL_proc  = np.zeros((rows, cols/2, 3), np.uint8)
-        self.img_display = np.zeros((rows, cols  , 3), np.uint8)
-
     def main(self):
         '''
         There are three major steps for the image processing pipeline,
@@ -144,7 +150,7 @@ class ProcessThread(AbstractThread):
 
         # Compute stereo depth map (optional)
         if self.computingDepth:
-            self.imgL_1 = self.compute_depth(self.imgR_1, self.imgL_1)
+            self.imgL_1 = self.compute_depth()
 
         # (3) Combine images.
         h, w = self.display_height, self.display_width
@@ -156,19 +162,8 @@ class ProcessThread(AbstractThread):
 
         self.emit_fps_info()
 
-    def compute_depth(self, imgR, imgL):
-        # Convert to gray scale
-        imgR_ = cv2.cvtColor(imgR, cv2.COLOR_BGR2GRAY)
-        imgL_ = cv2.cvtColor(imgL, cv2.COLOR_BGR2GRAY)
-
-        # Compute stereo disparity
-        stereo = cv2.StereoBM(cv2.STEREO_BM_BASIC_PRESET, self.ndisparities, self.SADWindowSize)
-        D = stereo.compute(imgL_, imgR_).astype(np.float)
-        depth_map = ( D - np.min(D) ) / ( np.max(D) - np.min(D) ) * 255
-
-        for ch in xrange(3):
-            imgL[:, :, ch] = depth_map.astype(np.uint8)
-
+    def compute_depth(self):
+        imgL = stereo.compute_depth(self.imgR_1, self.imgL_1, self.ndisparities, self.SADWindowSize)
         return imgL
 
     def emit_fps_info(self):
@@ -256,13 +251,18 @@ class ProcessThread(AbstractThread):
         for key, value in parameters.items():
             setattr(self, key, value)
 
-    def set_display_size(self, width, height):
+    def change_display_size(self, width, height):
+
+        # Get to know if this thread (MICRO or AMBIENT) is the active one
+        isActive = not self.isPaused
+
         self.pause()
 
-        self.display_width, self.display_height = width, height
+        self.set_display_size(width, height)
         self.set_resize_matrix()
 
-        self.resume()
+        if isActive: # Resume only if this thread is the active one
+            self.resume()
 
     def get_processed_images(self):
         return self.imgR_proc, self.imgL_proc

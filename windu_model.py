@@ -7,6 +7,7 @@ from windu_controller import *
 from all_threads import *
 from single_camera import *
 from constants import *
+from stereo import Stereo as stereo
 
 
 
@@ -29,8 +30,6 @@ class WinduCore(object):
         # Pass the gui object into the mediator object, so the mediator knows where to emit the signal.
         self.mediator = Mediator(self.gui)
 
-        self.__init__signals(connect=True)
-
         self.view_mode = MICRO
 
         # Start the video thread, also concurrent threads
@@ -45,7 +44,7 @@ class WinduCore(object):
 
         The parameter 'connect' specifies whether connect or disconnect signals.
         '''
-        signal_names = ['display_topography', 'progress_update']
+        signal_names = ['']
 
         if connect:
             self.mediator.connect_signals(signal_names)
@@ -186,9 +185,6 @@ class WinduCore(object):
         'Should be called upon software termination.'
         self.stop_video_thread()
 
-        # Disconnect signals from the gui object
-        self.__init__signals(connect=False)
-
     # Methods called by the controller object
 
     def snapshot(self, fname):
@@ -218,132 +214,9 @@ class WinduCore(object):
     def zoom_out(self):
         self.active_proc_thread.zoom_out()
 
-    def stereo_reconstruction(self, x_scale=0.01, y_scale=0.01, z_scale=0.002):
-        '''
-        1) Get dual images from the video thread.
-        2) Convert to gray scale.
-        3) Adjust image offset by translation.
-        4) Compute stereo disparity, i.e. depth map.
-        5) Build vertex map, which has 6 channels: X Y Z R G B
-        6) Build vertex list. Each point has 9 values: X Y Z R G B Nx Ny Nz
-                                                                  (N stands for normal vector)
-        '''
-
+    def stereo_reconstruction(self):
         self.active_proc_thread.pause()
-
-        # Get the raw BGR (not RGB) images from both cameras
-        imgR, imgL = self.active_proc_thread.get_processed_images()
-
-        rows, cols, channels = imgL.shape
-
-        # Convert to gray scale to compute stereo disparity
-        imgR_gray = cv2.cvtColor(imgR, cv2.COLOR_BGR2GRAY)
-        imgL_gray = cv2.cvtColor(imgL, cv2.COLOR_BGR2GRAY)
-
-        # Compute stereo disparity
-        ndisparities = self.active_proc_thread.ndisparities # Must be divisible by 16
-        SADWindowSize = self.active_proc_thread.SADWindowSize # Must be odd, be within 5..255 and be not larger than image width or height
-        stereo = cv2.StereoBM(cv2.STEREO_BM_BASIC_PRESET, ndisparities, SADWindowSize)
-        disparity = stereo.compute(imgL_gray, imgR_gray)
-
-        # Build vertex map
-        # For each point there are 6 channels:
-        #   channels 0..2 : X Y Z coordinates
-        #   channels 3..5 : R G B color values
-        vertex_map = np.zeros( (rows, cols, 6), np.float )
-
-        # Channels 0, 1: X (column) and Y (row) coordinates
-        for r in xrange(rows):
-            for c in xrange(cols):
-                vertex_map[r, c, 0] = (c - cols/2) * x_scale # Centered and scaled
-                vertex_map[r, c, 1] = (r - rows/2) * y_scale
-
-        # Channel 2: Z (disparity) cooridnates
-        vertex_map[:, :, 2] = disparity * z_scale # Scaled
-
-        # Channels 3, 4, 5: RGB values
-        # '::-1' inverts the sequence of BGR (in OpenCV) to RGB
-        # OpenGL takes color values between 0 and 1, so divide by 255
-        vertex_map[:, :, 3:6] = imgL[:, :, ::-1] / 255.0
-
-        # Start building vertex list
-        # Each point has 9 values: X Y Z R G B Nx Ny Nz
-        numVertices = (rows - 1) * (cols - 1) * 6
-        vertex_list = np.zeros( (numVertices, 9), np.float )
-
-        V_map = vertex_map
-        V_list = vertex_list
-        i = 0
-        percent_past = 0
-        for r in xrange(rows-1):
-
-            percent = int( ( (r + 1) / float(rows - 1) ) * 100 )
-
-            # Emit progress signal only when there is an increase in precentage
-            if not percent == percent_past:
-                percent_past = percent
-                self.mediator.emit_signal( signal_name = 'progress_update',
-                                           arg = ('Rendering 3D Model', percent) )
-
-            for c in xrange(cols-1):
-
-                # Four point coordinates
-                P1 = V_map[r  , c  , 0:3]
-                P2 = V_map[r  , c+1, 0:3]
-                P3 = V_map[r+1, c  , 0:3]
-                P4 = V_map[r+1, c+1, 0:3]
-
-                # Four point colors
-                C1 = V_map[r  , c  , 3:6]
-                C2 = V_map[r  , c+1, 3:6]
-                C3 = V_map[r+1, c  , 3:6]
-                C4 = V_map[r+1, c+1, 3:6]
-
-                # First triangle STARTS
-                N = np.cross(P2-P1, P4-P1)
-                N = N / np.sqrt(np.sum(N**2))
-
-                V_list[i, 0:3] = P1 # Coordinate
-                V_list[i, 3:6] = C1 # Color
-                V_list[i, 6:9] = N  # Noraml vector
-                i = i + 1
-                V_list[i, 0:3] = P4
-                V_list[i, 3:6] = C4
-                V_list[i, 6:9] = N
-                i = i + 1
-                V_list[i, 0:3] = P2
-                V_list[i, 3:6] = C2
-                V_list[i, 6:9] = N
-                i = i + 1
-                # First triangle ENDS
-
-                # Second triangle STARTS
-                N = np.cross(P4-P1, P3-P1)
-                N = N / np.sqrt(np.sum(N**2))
-
-                V_list[i, 0:3] = P1
-                V_list[i, 3:6] = C1
-                V_list[i, 6:9] = N
-                i = i + 1
-                V_list[i, 0:3] = P3
-                V_list[i, 3:6] = C3
-                V_list[i, 6:9] = N
-                i = i + 1
-                V_list[i, 0:3] = P4
-                V_list[i, 3:6] = C4
-                V_list[i, 6:9] = N
-                i = i + 1
-                # Second triangle ENDS
-
-        self.mediator.emit_signal( signal_name = 'progress_update',
-                                   arg = ('Displaying 3D Topography', 0) )
-
-        self.mediator.emit_signal( signal_name = 'display_topography',
-                                   arg = vertex_list )
-
-        self.mediator.emit_signal( signal_name = 'progress_update',
-                                   arg = ('Displaying 3D Topography', 100) )
-
+        stereo.reconstruction(self.active_proc_thread, self.mediator)
         self.active_proc_thread.resume()
 
     def apply_depth_parameters(self, parameters):
@@ -365,7 +238,8 @@ class WinduCore(object):
         Args:
             dim: a tuple of (width, height)
         '''
-        self.active_proc_thread.set_display_size(width=dim[0], height=dim[1])
+        for t in self.proc_threads.values():
+            t.change_display_size(width=dim[0], height=dim[1])
 
     def start_select_cam(self):
         self.stop_video_thread()
