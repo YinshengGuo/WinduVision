@@ -1,5 +1,11 @@
 '''
---- This is version 9.5 ---
+--- This is version 9.6 ---
+
+    Animated icons
+
+
+
+--- Version 9.5 ---
 
     Separate set_display_size from set_resize_matrix in the ProcessThread class.
     This fixes the blinking issue when zooming, as...

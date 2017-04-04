@@ -74,13 +74,13 @@ class CamTuneThread(AbstractThread):
         # If gain out of range, adjust exposure without adjusting gain
         if gain > self.gain_max:
             exposure = exposure - 1
-            if exposure > self.exposure_min:
+            if exposure >= self.exposure_min:
                 set(name='exposure', value=exposure)
             return
 
         elif gain < self.gain_min:
             exposure = exposure + 1
-            if exposure < self.exposure_max:
+            if exposure <= self.exposure_max:
                 set(name='exposure', value=exposure)
             return
 

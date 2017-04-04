@@ -314,10 +314,23 @@ class WinduGUI(QtGui.QMainWindow):
         self.monitor.setPixmap(Q_pixmap)
 
     def recording_starts(self):
-        self.actions['toggle_recording'].setIcon(QtGui.QIcon('icons/stop_recording.png'))
+
+        # Set icons for animation in a list
+        icons = []
+        for i in xrange(1, 3):
+            fpath = 'icons/stop_recording_{}.png'.format(i)
+            icons.append( QtGui.QIcon(fpath) )
+
+        action = self.actions['toggle_recording']
+
+        self.recording_animator = IconAnimator(QAction = action, # the QAction in which the icon is animated
+                                                QIcons = icons)  # a list of QIcons to be animated
+        self.recording_animator.start(500)
+
         self.actions['toggle_recording'].setText('Stop (Ctrl+R)')
 
     def recording_ends(self, temp_filename):
+        self.recording_animator.stop()
         self.actions['toggle_recording'].setIcon(QtGui.QIcon('icons/toggle_recording.png'))
         self.actions['toggle_recording'].setText('Record Video')
 
@@ -347,12 +360,31 @@ class WinduGUI(QtGui.QMainWindow):
         self.actions['toggle_auto_offset'].setText('Start Auto-alignment')
 
     def auto_cam_resumed(self):
-        self.actions['toggle_auto_cam'].setIcon(QtGui.QIcon('icons/pause_auto_cam.png'))
+
+        # Set icons for animation in a list
+        icons = []
+        for i in xrange(1, 5):
+            fpath = 'icons/auto_cam_resumed_{}.png'.format(i)
+            icons.append( QtGui.QIcon(fpath) )
+
+        action = self.actions['toggle_auto_cam']
+
+        self.auto_cam_animator = IconAnimator(QAction = action, # the QAction in which the icon is animated
+                                               QIcons = icons)  # a list of QIcons to be animated
+        self.auto_cam_animator.start(500)
+
         self.actions['toggle_auto_cam'].setText('Stop Camera Auto Mode')
 
     def auto_cam_paused(self):
+        self.auto_cam_animator.stop()
         self.actions['toggle_auto_cam'].setIcon(QtGui.QIcon('icons/toggle_auto_cam.png'))
         self.actions['toggle_auto_cam'].setText('Camera Auto Mode')
+
+    def animate_icon(self, timer, action_key, icon_name, num_icons):
+        timer.i += 1
+        i = timer.i % num_icons + 1
+        fpath = 'icons/{}_{}.png'.format(icon_name, i)
+        self.actions[action_key].setIcon(QtGui.QIcon(fpath))
 
     def set_info_text(self, text):
         self.info_window.setText(text)
@@ -425,6 +457,27 @@ class WinduGUI(QtGui.QMainWindow):
 
     def select_cam_done(self):
         self.controller.call_method(method_name = 'start_video_thread')
+
+
+
+class IconAnimator(QtCore.QTimer):
+
+    def __init__(self, QAction, QIcons):
+
+        super(IconAnimator, self).__init__()
+
+        self.QAction = QAction
+        self.QIcons = QIcons
+        self.i = 0
+        self.timeout.connect(self.animate)
+
+    def animate(self):
+
+        self.i += 1
+        if self.i == len(self.QIcons):
+            self.i = 0
+
+        self.QAction.setIcon(self.QIcons[self.i])
 
 
 
