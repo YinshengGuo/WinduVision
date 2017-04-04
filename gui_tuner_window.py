@@ -1,6 +1,6 @@
 import cv2, time, sys, threading, os, json
 from PyQt4 import QtCore, QtGui, QtOpenGL
-from constants import *
+from windu_constants import *
 
 
 
