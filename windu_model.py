@@ -4,9 +4,9 @@ from OpenGL import GL
 
 from windu_view import *
 from windu_controller import *
-from all_threads import *
+from windu_threads import *
+from windu_constants import *
 from single_camera import *
-from constants import *
 from stereo import Stereo as stereo
 
 

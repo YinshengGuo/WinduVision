@@ -1,5 +1,11 @@
 '''
---- This is version 9.6 ---
+--- This is version 9.7 ---
+
+    Spread out gui codes in multiple files.
+
+
+
+--- Version 9.6 ---
 
     Animated icons
 
