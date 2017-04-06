@@ -16,7 +16,9 @@ class AlignThread(AbstractThread):
         self.mediator = mediator
 
         self.connect_signals(mediator = self.mediator,
-                             signal_names = ['auto_offset_resumed', 'auto_offset_paused'])
+                             signal_names = ['auto_offset_resumed',
+                                             'auto_offset_paused' ,
+                                             'set_info_text'      ])
 
         # Construct a queue of offset values
         self.X = np.zeros((10, ), np.float)
@@ -41,6 +43,8 @@ class AlignThread(AbstractThread):
         x_avg = np.average(np.sort(self.X)[1:-1])
         y_avg = np.average(np.sort(self.Y)[1:-1])
 
+        self.emit_info(x_avg, y_avg)
+
         # Set the offset value, which effectly moves the left image
         self.process_thread.set_offset(x_avg, y_avg)
 
@@ -53,6 +57,16 @@ class AlignThread(AbstractThread):
             # Under stable condition, in which the current offset doesn't differ from the average,
             # Check alignment every ~1 second.
             time.sleep(1)
+
+    def emit_info(self, x_off, y_off):
+
+        text = 'Align thread x_offset, y_offset: {}, {}'.format(x_off, y_off)
+
+        data = {'line': 6,
+                'text': text}
+
+        self.mediator.emit_signal( signal_name = 'set_info_text',
+                                   arg = data )
 
     def before_resuming(self):
         self.mediator.emit_signal('auto_offset_resumed')

@@ -7,19 +7,50 @@ from abstract_thread import *
 
 class CaptureThread(AbstractThread):
 
-    def __init__(self, camera):
+    def __init__(self, camera, mediator):
         '''
         which_cam: could be one of the three constants [CAM_R, CAM_L or CAM_E]
         '''
         super(CaptureThread, self).__init__()
 
         self.cam = camera
+        self.mediator = mediator
+        self.connect_signals(mediator, ['set_info_text'])
+
         self.img = self.cam.read()
+
+        self.t_series = [time.clock() for i in range(30)]
 
     def main(self):
 
         # Read the images from the cameras
         self.img = self.cam.read()
+
+        self.emit_fps_info()
+
+    def emit_fps_info(self):
+        '''
+        Emits real-time frame-rate info to the gui
+        '''
+
+        # Shift time series by one
+        self.t_series[1:] = self.t_series[:-1]
+
+        # Get the current time -> First in the series
+        self.t_series[0] = time.clock()
+
+        # Calculate frame rate
+        rate = len(self.t_series) / (self.t_series[0] - self.t_series[-1])
+
+        line = {CAM_R: 0, CAM_L: 1, CAM_E: 2}
+
+        which_cam = self.cam.get_key() # CAM_R, CAM_L or CAM_E
+
+        data = {'line': line[which_cam],
+                'text': 'Capture thread {}: {} fps'.format(which_cam, rate)}
+
+        self.mediator.emit_signal( signal_name = 'set_info_text',
+                                   arg = data )
 
     def set_camera_parameters(self, parameters):
 

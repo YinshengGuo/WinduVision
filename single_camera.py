@@ -146,6 +146,9 @@ class SingleCamera(object):
 
         return self.parm_vals[name]
 
+    def get_key(self):
+        return self.which_cam
+
     def close(self):
         if not self.cap is None:
             self.cap.release()

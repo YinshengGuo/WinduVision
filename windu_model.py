@@ -101,7 +101,8 @@ class WinduCore(object):
         'Instantiate and start 3 capture threads'
         self.cap_threads = {}
         for key in [CAM_R, CAM_L, CAM_E]:
-            self.cap_threads[key] = CaptureThread(camera = self.cams[key])
+            self.cap_threads[key] = CaptureThread(camera = self.cams[key],
+                                                mediator = self.mediator)
             self.cap_threads[key].start()
 
     def init_proc_threads(self):

@@ -162,6 +162,7 @@ class WinduGUI(QtGui.QMainWindow):
     def open_info(self):
         if not self.info_window.isVisible():
             self.info_window.show()
+            self.info_window.setGeometry(150, 150, 512, 512)
 
     def open_gl_window(self):
         if not self.gl_window.isVisible():
@@ -380,8 +381,8 @@ class WinduGUI(QtGui.QMainWindow):
         self.actions['toggle_auto_cam'].setIcon(QtGui.QIcon('icons/toggle_auto_cam.png'))
         self.actions['toggle_auto_cam'].setText('Camera Auto Mode')
 
-    def set_info_text(self, text):
-        self.info_window.setText(text)
+    def set_info_text(self, data):
+        self.info_window.setText(data['line'], data['text'])
 
     def display_topography(self, vertices):
         self.gl_window.gl_widget.updateObject(vertices)

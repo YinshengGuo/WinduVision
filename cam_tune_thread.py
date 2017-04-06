@@ -1,5 +1,5 @@
 import numpy as np
-import cv2, time, sys, math
+import cv2, time, sys, math, json
 from abstract_thread import *
 
 
@@ -13,19 +13,28 @@ class CamTuneThread(AbstractThread):
         self.cap_thread = cap_thread
         self.mediator = mediator
 
-        self.connect_signals(mediator = self.mediator,
-                             signal_names = ['auto_cam_resumed', 'auto_cam_paused'])
+        self.connect_signals(mediator = mediator,
+                             signal_names = ['auto_cam_resumed',
+                                             'auto_cam_paused' ,
+                                             'set_info_text'   ])
 
-        self.goal = 100.0
-        self.tolerance = 2.5 # i.e. 100 +/- 2.5
+        self.__init__parameters()
 
-        self.learn_rate = 0.1 # learning rate for adjusting gain
+    def __init__parameters(self):
 
-        self.gain_max = 100
-        self.gain_min = 0
+        with open('parameters/auto_cam.json', 'r') as fh:
+            parms = json.loads(fh.read())
 
-        self.exposure_max = -1
-        self.exposure_min = -7
+        L = ['goal',
+             'tolerance', # i.e. goal +/- tolerance
+             'learn_rate', # learning rate for adjusting gain
+             'gain_max',
+             'gain_min',
+             'exposure_max',
+             'exposure_min']
+
+        for name in L:
+            setattr(self, name, parms[name])
 
     def main(self):
 
@@ -47,15 +56,17 @@ class CamTuneThread(AbstractThread):
 
 
         img = self.get_roi(self.cap_thread.get_image())
-        diff = self.goal - np.average(img)
+        mean = np.average(img)
+        diff = self.goal - mean
+
+        self.emit_info(mean)
 
         # Control the frequency of the main loop according to the difference.
         if abs(diff) > self.tolerance:
-            time.sleep(1.0 / abs(diff)) # sleep time = the inverse of diff
+            t = 1.0 / abs(diff) # sleep time = the inverse of diff
+            time.sleep(t)
         else:
             time.sleep(1)
-
-
 
         # print 'gain={}, exposure={}, mean={}, diff={}'.format(gain, exposure, np.average(img), diff)
 
@@ -76,16 +87,30 @@ class CamTuneThread(AbstractThread):
             exposure = exposure - 1
             if exposure >= self.exposure_min:
                 set(name='exposure', value=exposure)
+                set(name='gain', value=self.gain_min)
+                time.sleep(0.1) # Takes a while before the exposure change takes effect
             return
 
         elif gain < self.gain_min:
             exposure = exposure + 1
             if exposure <= self.exposure_max:
                 set(name='exposure', value=exposure)
+                set(name='gain', value=self.gain_max)
+                time.sleep(0.1)
             return
 
         else:
             set(name='gain', value=gain)
+
+    def emit_info(self, mean):
+
+        text = 'Tuning camR image mean: {}'.format(mean)
+
+        data = {'line': 4,
+                'text': text}
+
+        self.mediator.emit_signal( signal_name = 'set_info_text',
+                                   arg = data )
 
     def before_resuming(self):
         self.mediator.emit_signal(signal_name = 'auto_cam_resumed')

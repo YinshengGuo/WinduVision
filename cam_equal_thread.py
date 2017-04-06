@@ -1,5 +1,5 @@
 import numpy as np
-import cv2, time, sys, threading
+import cv2, time, sys, threading, json
 from abstract_thread import *
 
 
@@ -17,12 +17,23 @@ class CamEqualThread(AbstractThread):
 
         # Mediator emits signal to the gui object
         self.mediator = mediator
+        self.connect_signals(mediator, 'set_info_text')
 
         self.cap_thread_R = cap_thread_R
         self.cap_thread_L = cap_thread_L
 
-        self.tolerance = 2.5 # i.e. mean(imgR) +/- 2.5
-        self.learn_rate = 0.2 # learning rate for adjusting gain
+        self.__init__parameters()
+
+    def __init__parameters(self):
+
+        with open('parameters/auto_cam.json', 'r') as fh:
+            parms = json.loads(fh.read())
+
+        L = ['tolerance', # i.e. +/- tolerance
+             'learn_rate'] # learning rate for adjusting gain
+
+        for name in L:
+            setattr(self, name, parms[name])
 
     def main(self):
 
@@ -51,7 +62,12 @@ class CamEqualThread(AbstractThread):
         imgR = self.get_roi(self.cap_thread_R.get_image())
         imgL = self.get_roi(self.cap_thread_L.get_image())
 
-        diff = np.average(imgR) - np.average(imgL)
+        mean_R = np.average(imgR)
+        mean_L = np.average(imgL)
+
+        self.emit_info(mean_L)
+
+        diff = mean_R - mean_L
 
         # Control the frequency of the main loop according to the difference.
         if abs(diff) > self.tolerance:
@@ -73,6 +89,16 @@ class CamEqualThread(AbstractThread):
             return # Do nothing if it's within tolerated range
 
         self.cap_thread_L.set_one_cam_parm(name='gain', value=gain_L)
+
+    def emit_info(self, mean):
+
+        text = 'Equalizing camL image mean: {}'.format(mean)
+
+        data = {'line': 5,
+                'text': text}
+
+        self.mediator.emit_signal( signal_name = 'set_info_text',
+                                   arg = data )
 
     def get_roi(self, img):
 

@@ -180,10 +180,11 @@ class ProcessThread(AbstractThread):
         # Calculate frame rate
         rate = len(self.t_series) / (self.t_series[0] - self.t_series[-1])
 
-        text = 'Frame rate = {} fps'.format(rate)
+        data = {'line': 3,
+                'text': 'Active process thread: {} fps'.format(rate)}
 
         self.mediator.emit_signal( signal_name = 'set_info_text',
-                                   arg = text )
+                                   arg = data )
 
     # Methods commanded by the high-level core object.
 

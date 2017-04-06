@@ -8,20 +8,25 @@ class TextWindow(QtGui.QWidget):
 
         self.setWindowTitle('Info')
         self.setWindowIcon(QtGui.QIcon('icons/windu_vision.png'))
-        self.setGeometry(150, 150, 512, 256)
-        self.setFixedSize(512, 256)
+        self.setGeometry(150, 150, 512, 512)
 
         self.font = QtGui.QFont()
-        self.font.setFamily('Segoe UI')
+        self.font.setFamily('Consolas')
         self.font.setBold(False)
         self.font.setPixelSize(14)
 
-        self.textbox = QtGui.QLabel(self)
-        self.textbox.setGeometry(0, 0, 512, 256)
-        self.textbox.setAlignment(QtCore.Qt.AlignLeft)
-        self.textbox.setFont(self.font)
+        self.vbox = QtGui.QVBoxLayout()
+        self.setLayout(self.vbox)
+        self.textboxes = []
+        for i in xrange(10):
+            tb = QtGui.QLabel(self)
+            tb.setAlignment(QtCore.Qt.AlignLeft)
+            tb.setAlignment(QtCore.Qt.AlignVCenter)
+            tb.setFont(self.font)
+            self.textboxes.append(tb)
+            self.vbox.insertWidget(len(self.vbox), tb)
 
-    def setText(self, text):
-        self.textbox.setText(text)
+    def setText(self, line, text):
+        self.textboxes[line].setText(text)
 
 

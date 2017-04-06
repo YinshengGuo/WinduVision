@@ -1,5 +1,14 @@
 '''
---- This is version 9.7 ---
+--- This is version 9.8 ---
+
+    Store camera tuning parameters in the auto_cam.json file.
+
+    Create multiple lines of info text display in the gui.
+    Now most of the threads are emitting real-time info to the gui.
+
+
+
+--- Version 9.7 ---
 
     Spread out gui codes in multiple files.
 
