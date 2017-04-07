@@ -16,7 +16,8 @@ class CamTuneThread(AbstractThread):
         self.connect_signals(mediator = mediator,
                              signal_names = ['auto_cam_resumed',
                                              'auto_cam_paused' ,
-                                             'set_info_text'   ])
+                                             'set_info_text'   ,
+                                             'update_cam_parm' ])
 
         self.__init__parameters()
 
@@ -38,37 +39,23 @@ class CamTuneThread(AbstractThread):
 
     def main(self):
 
+        self.check_gain()
+        self.check_exposure()
+
         gain = self.cap_thread.get_one_cam_parm('gain')
         exposure = self.cap_thread.get_one_cam_parm('exposure')
-
-        set = self.cap_thread.set_one_cam_parm
-
-        if gain < self.gain_min:
-            set(name='gain', value=self.gain_min)
-        elif gain > self.gain_max:
-            set(name='gain', value=self.gain_max)
-
-        if exposure < self.exposure_min:
-            set(name='exposure', value=self.exposure_min)
-        if exposure > self.exposure_max:
-            set(name='exposure', value=self.exposure_max)
-
-
-
         img = self.get_roi(self.cap_thread.get_image())
         mean = np.average(img)
-        diff = self.goal - mean
 
         self.emit_info(mean)
 
+        diff = self.goal - mean
+
         # Control the frequency of the main loop according to the difference.
         if abs(diff) > self.tolerance:
-            t = 1.0 / abs(diff) # sleep time = the inverse of diff
-            time.sleep(t)
+            time.sleep(0.1)
         else:
             time.sleep(1)
-
-        # print 'gain={}, exposure={}, mean={}, diff={}'.format(gain, exposure, np.average(img), diff)
 
         # Dynamically adjust gain according to the difference
         if diff > self.tolerance:
@@ -80,27 +67,43 @@ class CamTuneThread(AbstractThread):
         else:
             return # Do nothing if it's within tolerated range
 
-
-
         # If gain out of range, adjust exposure without adjusting gain
         if gain > self.gain_max:
-            exposure = exposure - 1
+            exposure = exposure - 1 # exposure brighter
             if exposure >= self.exposure_min:
-                set(name='exposure', value=exposure)
-                set(name='gain', value=self.gain_min)
+                self.set_cam(name='exposure', value=exposure)
+                self.set_cam(name='gain', value=self.gain_min)
                 time.sleep(0.1) # Takes a while before the exposure change takes effect
             return
 
         elif gain < self.gain_min:
-            exposure = exposure + 1
+            exposure = exposure + 1 # exposure darker
             if exposure <= self.exposure_max:
-                set(name='exposure', value=exposure)
-                set(name='gain', value=self.gain_max)
+                self.set_cam(name='exposure', value=exposure)
+                self.set_cam(name='gain', value=self.gain_max)
                 time.sleep(0.1)
             return
 
         else:
-            set(name='gain', value=gain)
+            self.set_cam(name='gain', value=gain)
+
+    def check_gain(self):
+
+        gain = self.cap_thread.get_one_cam_parm('gain')
+
+        if gain < self.gain_min:
+            self.set_cam(name='gain', value=self.gain_min)
+        elif gain > self.gain_max:
+            self.set_cam(name='gain', value=self.gain_max)
+
+    def check_exposure(self):
+
+        exposure = self.cap_thread.get_one_cam_parm('exposure')
+
+        if exposure < self.exposure_min:
+            self.set_cam(name='exposure', value=self.exposure_min)
+        elif exposure > self.exposure_max:
+            self.set_cam(name='exposure', value=self.exposure_max)
 
     def emit_info(self, mean):
 
@@ -111,6 +114,19 @@ class CamTuneThread(AbstractThread):
 
         self.mediator.emit_signal( signal_name = 'set_info_text',
                                    arg = data )
+
+    def set_cam(self, name, value):
+        ret = self.cap_thread.set_one_cam_parm(name, value)
+        if ret:
+            self.update_gui(name)
+
+    def update_gui(self, name):
+        which_cam = self.cap_thread.get_which_cam()
+
+        data = {'which_cam': which_cam,
+                'name': name}
+
+        self.mediator.emit_signal('update_cam_parm', data)
 
     def before_resuming(self):
         self.mediator.emit_signal(signal_name = 'auto_cam_resumed')
@@ -133,4 +149,5 @@ class CamTuneThread(AbstractThread):
 
     def set_cap_thread(self, thread):
         self.cap_thread = thread
+
 

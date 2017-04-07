@@ -453,6 +453,19 @@ class WinduGUI(QtGui.QMainWindow):
     def select_cam_done(self):
         self.controller.call_method(method_name = 'start_video_thread')
 
+    def update_cam_parm(self, data):
+
+        # Unpack data
+        which_cam = data['which_cam']
+        name = data['name']
+
+        if which_cam == CAM_R:
+            self.camera_tuner_window_R.update_parameter(name)
+        elif which_cam == CAM_L:
+            self.camera_tuner_window_L.update_parameter(name)
+        else:
+            self.camera_tuner_window_E.update_parameter(name)
+
 
 
 if __name__ == '__main__':

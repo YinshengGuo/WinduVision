@@ -227,13 +227,19 @@ class CameraTunerWindow(TunerWindow):
         self.controller.call_method( method_name = 'apply_camera_parameters',
                                              arg = data                     )
 
-    def update_parameter(self):
+    def update_parameter(self, name=None):
 
         filepath = 'parameters/' + self.which_cam + '.json'
         with open(filepath, 'r') as fh:
             parameters = json.loads(fh.read())
 
-        for name, value in parameters.items():
-            self.set_parameter(name, value)
+        # Update all parameter values in the slider...
+        #     if no name is passed in
+        if name == None:
+            for name, value in parameters.items():
+                self.set_parameter(name, value)
+
+        else:
+            self.set_parameter(name=name, value=parameters[name])
 
 

@@ -146,7 +146,7 @@ class SingleCamera(object):
 
         return self.parm_vals[name]
 
-    def get_key(self):
+    def get_which_cam(self):
         return self.which_cam
 
     def close(self):

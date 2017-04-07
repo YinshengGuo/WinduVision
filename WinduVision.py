@@ -1,5 +1,12 @@
 '''
---- This is version 9.8 ---
+--- This is version 9.9 ---
+
+    Real-time update camera parameters in the gui tuner window...
+        when the auto camera tuning is running.
+
+
+
+--- Version 9.8 ---
 
     Store camera tuning parameters in the auto_cam.json file.
 

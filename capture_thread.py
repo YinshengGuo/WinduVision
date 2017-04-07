@@ -14,6 +14,7 @@ class CaptureThread(AbstractThread):
         super(CaptureThread, self).__init__()
 
         self.cam = camera
+        self.which_cam = camera.get_which_cam()
         self.mediator = mediator
         self.connect_signals(mediator, ['set_info_text'])
 
@@ -42,15 +43,21 @@ class CaptureThread(AbstractThread):
         # Calculate frame rate
         rate = len(self.t_series) / (self.t_series[0] - self.t_series[-1])
 
+        # Emit to different lines of text window...
+        #     for different cameras
         line = {CAM_R: 0, CAM_L: 1, CAM_E: 2}
 
-        which_cam = self.cam.get_key() # CAM_R, CAM_L or CAM_E
+        which_cam = self.cam.get_which_cam() # CAM_R, CAM_L or CAM_E
+        text = 'Capture thread {}: {} fps'.format(which_cam, rate)
 
         data = {'line': line[which_cam],
-                'text': 'Capture thread {}: {} fps'.format(which_cam, rate)}
+                'text': text}
 
         self.mediator.emit_signal( signal_name = 'set_info_text',
                                    arg = data )
+
+    def get_image(self):
+        return self.img
 
     def set_camera_parameters(self, parameters):
 
@@ -72,7 +79,6 @@ class CaptureThread(AbstractThread):
         if self.cam:
             return self.cam.get_one_parm(name)
 
-    def get_image(self):
-        return self.img
-
+    def get_which_cam(self):
+        return self.which_cam
 

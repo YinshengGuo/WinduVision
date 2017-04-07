@@ -51,7 +51,7 @@ class CamEqualThread(AbstractThread):
 
         for name in ['brightness', 'contrast', 'exposure']:
             if parm_R[name] != parm_L[name]:
-                self.cap_thread_L.set_one_cam_parm(name=name, value=parm_R[name])
+                self.set_camL(name=name, value=parm_R[name])
 
     def tune_left_camera(self):
         '''
@@ -71,7 +71,7 @@ class CamEqualThread(AbstractThread):
 
         # Control the frequency of the main loop according to the difference.
         if abs(diff) > self.tolerance:
-            time.sleep(1.0 / abs(diff)) # sleep time = the inverse of diff
+            time.sleep(0.1)
         else:
             time.sleep(1)
 
@@ -88,7 +88,7 @@ class CamEqualThread(AbstractThread):
         else:
             return # Do nothing if it's within tolerated range
 
-        self.cap_thread_L.set_one_cam_parm(name='gain', value=gain_L)
+        self.set_camL(name='gain', value=gain_L)
 
     def emit_info(self, mean):
 
@@ -99,6 +99,19 @@ class CamEqualThread(AbstractThread):
 
         self.mediator.emit_signal( signal_name = 'set_info_text',
                                    arg = data )
+
+    def set_camL(self, name, value):
+        ret = self.cap_thread_L.set_one_cam_parm(name, value)
+        if ret:
+            self.update_gui(name)
+
+    def update_gui(self, name):
+        which_cam = self.cap_thread_L.get_which_cam()
+
+        data = {'which_cam': which_cam,
+                'name': name}
+
+        self.mediator.emit_signal('update_cam_parm', data)
 
     def get_roi(self, img):
 
