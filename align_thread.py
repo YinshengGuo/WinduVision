@@ -80,4 +80,12 @@ class AlignThread(AbstractThread):
     def set_process_thread(self, thread):
         self.process_thread = thread
 
+    def zero_offset(self):
+        self.X = np.zeros((10, ), np.float)
+        self.Y = np.zeros((10, ), np.float)
+
+        self.process_thread.set_offset(0, 0)
+
+
+
 

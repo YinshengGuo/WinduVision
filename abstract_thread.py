@@ -15,21 +15,25 @@ class AbstractThread(threading.Thread):
 
         # The default initiation state is paused
         # Therefore when the self.start() method is invoked...
-        #     the main loop does not do the self.main() method.
+        #     the main loop does not go through the self.main() method.
         # The reason of this additional layer of control is to let...
         #     higher-level classes decide whether to do the main() task or not.
         self.pausing = True
         self.isPaused = True
 
-        self.dt = 0.01 # Dwelling time for an iteration of empty loops
-        self.fps = 0 # No timing the main loop
+        self.dt = 0.01 # The minimum dwelling time for an iteration of an empty loop
+        self.fps = 0 # If == 0, then no timing the main loop
 
         self.signal_names = None
         self.mediator = None
 
     @abc.abstractmethod
     def main(self):
-        time.sleep(self.dt)
+        '''
+        An abstract method required to be defined in subclasses.
+        This is the main task to be done in the thread.
+        '''
+        pass
 
     def connect_signals(self, mediator, signal_names):
         '''
@@ -38,7 +42,9 @@ class AbstractThread(threading.Thread):
 
         Each signal is defined by a unique str signal name.
 
-        The parameter 'connect' specifies whether connect or disconnect signals.
+        :parameter
+            mediator: the mediator object
+            signal_names: a list of strings as signal names
         '''
 
         self.signal_names = signal_names
@@ -53,7 +59,6 @@ class AbstractThread(threading.Thread):
 
     def run(self):
 
-        t0 = time.clock()
         while not self.stopping:
 
             # Pausing the loop (or not)
@@ -73,12 +78,12 @@ class AbstractThread(threading.Thread):
                 continue
 
             # Time the loop
-            while (time.clock() - t0) < (1./self.fps):
+            while (time.clock() - self.t0) < (1./self.fps):
                 # Sleeping for < 15 ms is not reliable across different platforms.
                 # Windows PCs generally have a minimum sleeping time > ~15 ms...
                 #     making this timer exceeding the specified period.
                 time.sleep(0.001)
-            t0 = time.clock()
+            self.t0 = time.clock()
 
         self.disconnect_signals()
         self.isStopped = True
@@ -99,6 +104,8 @@ class AbstractThread(threading.Thread):
             if not ret:
                 print 'The method before_resuming() returns False. Not able to resume.'
                 return
+
+            self.t0 = time.clock() # The very first time point before going through self.main()
 
             self.pausing = False
             # Wait until the main loop is really resumed before completing this method call.

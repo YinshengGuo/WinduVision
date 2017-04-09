@@ -205,6 +205,8 @@ class WinduCore(object):
         else:
             self.set_view_mode(mode=MICRO)
 
+        self.align_thread.zero_offset()
+
     def toggle_auto_cam(self):
         self.cam_tune_thread.toggle()
         self.cam_equal_thread.toggle()

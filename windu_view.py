@@ -24,26 +24,9 @@ class WinduGUI(QtGui.QMainWindow):
         self.monitor.setGeometry(0, 0, self.default_width, self.default_height)
         self.monitor.setAlignment(QtCore.Qt.AlignCenter)
 
-        self.toolbar = QtGui.QToolBar('Tool Bar')
-        self.toolbar_dev = QtGui.QToolBar('Developer Tool Bar')
-
-        for t in [self.toolbar, self.toolbar_dev]:
-            t.setMovable(True)
-            t.setStyleSheet("QToolBar { background:white; }")
-            t.setIconSize(QtCore.QSize(30, 45))
-            self.addToolBar(QtCore.Qt.LeftToolBarArea, t)
-
-        if not self.isDeveloper:
-            self.toolbar_dev.hide()
-
-        self.info_window = TextWindow()
-        self.progress_bar = ProgressBar()
-        self.gl_window = GLWindow( controller = self.controller )
-        self.depth_tuner_window = DepthTunerWindow( controller = self.controller )
-        self.camera_tuner_window_R = CameraTunerWindow( controller=self.controller, which_cam=CAM_R )
-        self.camera_tuner_window_L = CameraTunerWindow( controller=self.controller, which_cam=CAM_L )
-        self.camera_tuner_window_E = CameraTunerWindow( controller=self.controller, which_cam=CAM_E )
-
+        self.__init__labels()
+        self.__init__windows()
+        self.__init__toolbars()
         self.__init__toolbtns()
         self.__init__key_shortcut()
 
@@ -59,6 +42,60 @@ class WinduGUI(QtGui.QMainWindow):
             setattr(self, name, value)
 
         self.isDeveloper = False
+
+    def __init__labels(self):
+
+        self.font = {}
+        f = QtGui.QFont()
+        f.setFamily('Segoe UI')
+        f.setBold(True)
+        f.setPixelSize(24)
+        self.font['timer'] = f
+
+        self.time_label_L = QtGui.QLabel(self)
+        self.time_label_L.setGeometry(0, 0, self.default_width/2, 48)
+        self.time_label_R = QtGui.QLabel(self)
+        self.time_label_R.setGeometry(self.default_width/2, 0, self.default_width/2, 48)
+
+        style = '''QLabel {color: rgba(255, 255, 255, 255);
+                           background: rgba(0, 0, 0, 127)
+                           }'''
+        for l in [self.time_label_L, self.time_label_R]:
+            l.setAlignment(QtCore.Qt.AlignCenter)
+            l.setFont(self.font['timer'])
+            l.setStyleSheet(style)
+            l.hide()
+
+    def __init__windows(self):
+
+        self.info_window = TextWindow()
+        self.progress_bar = ProgressBar()
+        self.gl_window = GLWindow( controller = self.controller )
+        self.depth_tuner_window = DepthTunerWindow( controller = self.controller )
+        self.camera_tuner_window_R = CameraTunerWindow( controller=self.controller, which_cam=CAM_R )
+        self.camera_tuner_window_L = CameraTunerWindow( controller=self.controller, which_cam=CAM_L )
+        self.camera_tuner_window_E = CameraTunerWindow( controller=self.controller, which_cam=CAM_E )
+
+        self.all_windows = [self.info_window          ,
+                            self.progress_bar         ,
+                            self.gl_window            ,
+                            self.depth_tuner_window   ,
+                            self.camera_tuner_window_R,
+                            self.camera_tuner_window_L,
+                            self.camera_tuner_window_E]
+
+    def __init__toolbars(self):
+        self.toolbar = QtGui.QToolBar('Tool Bar')
+        self.toolbar_dev = QtGui.QToolBar('Developer Tool Bar')
+
+        for t in [self.toolbar, self.toolbar_dev]:
+            t.setMovable(True)
+            t.setStyleSheet('QToolBar {background: white; }')
+            t.setIconSize(QtCore.QSize(30, 45))
+            self.addToolBar(QtCore.Qt.LeftToolBarArea, t)
+
+        if not self.isDeveloper:
+            self.toolbar_dev.hide()
 
     def __init__toolbtns(self):
         # Each action has a unique key and a name
@@ -194,7 +231,10 @@ class WinduGUI(QtGui.QMainWindow):
             self.toolbar.hide()
 
         w, h = self.width(), self.height()
+
         self.monitor.setGeometry(0, 0, w, h)
+        self.time_label_L.setGeometry(0, 0, w/2, 48)
+        self.time_label_R.setGeometry(w/2, 0, w/2, 48)
 
         self.controller.call_method( method_name = 'set_display_size', arg = (w, h))
 
@@ -233,15 +273,7 @@ class WinduGUI(QtGui.QMainWindow):
         if reply == QtGui.QMessageBox.Yes:
             self.controller.call_method('close')
 
-            window_list = [self.info_window          ,
-                           self.progress_bar         ,
-                           self.gl_window            ,
-                           self.depth_tuner_window   ,
-                           self.camera_tuner_window_R,
-                           self.camera_tuner_window_L,
-                           self.camera_tuner_window_E]
-
-            for win in window_list:
+            for win in self.all_windows:
                 win.close()
 
             event.accept()
@@ -263,9 +295,9 @@ class WinduGUI(QtGui.QMainWindow):
         Called by an external object to connect signals.
         '''
 
-        # The suffix '(PyQt_PyObject)' means the argument to be transferred
-        # could be any type of python objects,
-        # not limited to Qt objects.
+        # The suffix '(PyQt_PyObject)' means the argument to be transferred...
+        #     could be any type of python objects...
+        #     not limited to Qt objects.
         signal = signal_name + '(PyQt_PyObject)'
 
         # The method name to be called = the signal name
@@ -330,10 +362,16 @@ class WinduGUI(QtGui.QMainWindow):
 
         self.actions['toggle_recording'].setText('Stop (Ctrl+R)')
 
+        for l in [self.time_label_L, self.time_label_R]:
+            l.show()
+
     def recording_ends(self, temp_filename):
         self.recording_animator.stop()
         self.actions['toggle_recording'].setIcon(QtGui.QIcon('icons/toggle_recording.png'))
         self.actions['toggle_recording'].setText('Record Video')
+
+        for l in [self.time_label_L, self.time_label_R]:
+            l.hide()
 
         i = 1
         while os.path.exists('stereo_video_%03d.avi' % i):
@@ -455,7 +493,6 @@ class WinduGUI(QtGui.QMainWindow):
 
     def update_cam_parm(self, data):
 
-        # Unpack data
         which_cam = data['which_cam']
         name = data['name']
 
@@ -465,6 +502,10 @@ class WinduGUI(QtGui.QMainWindow):
             self.camera_tuner_window_L.update_parameter(name)
         else:
             self.camera_tuner_window_E.update_parameter(name)
+
+    def set_time_label(self, text):
+        self.time_label_R.setText(text)
+        self.time_label_L.setText(text)
 
 
 

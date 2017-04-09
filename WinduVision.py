@@ -1,5 +1,14 @@
 '''
---- This is version 9.9 ---
+--- This is version 9.10 ---
+
+    Fixed the bug of resizing image (at fullscreen) in the writer_thread.
+    Dynamically check the image size and resize it to match the video width and height.
+
+    Added time label during recording.
+
+
+
+--- Version 9.9 ---
 
     Real-time update camera parameters in the gui tuner window...
         when the auto camera tuning is running.
