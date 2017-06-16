@@ -1,5 +1,16 @@
 '''
---- This is version 9.10 ---
+--- This is version 9.11 ---
+
+    Added the short cut "b" for USB foot pedal to switch view mode.
+
+    Slightly modified SingleCamera.read()...
+        to make sure image reading is successful before returning the img.
+
+    Modified the CamTuneThread.main() method.
+
+
+
+--- Version 9.10 ---
 
     Fixed the bug of resizing image (at fullscreen) in the writer_thread.
     Dynamically check the image size and resize it to match the video width and height.

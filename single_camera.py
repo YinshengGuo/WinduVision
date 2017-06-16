@@ -73,14 +73,13 @@ class SingleCamera(object):
 
         if not self.cap is None:
             ret, img = self.cap.read()
-            img = np.rot90(img, self.rotation)
-        else:
-            # Must insert a time delay to emulate camera harware delay
-            # Otherwise the program will crash due to full-speed looping
-            img = self.img_blank
-            time.sleep(0.01)
+            if ret:
+                return np.rot90(img, self.rotation)
 
-        return img
+        time.sleep(0.01)
+        # Must insert a time delay to emulate camera harware delay
+        # Otherwise the program will crash due to full-speed looping
+        return self.img_blank
 
     def set_parameters(self, parameters):
 
@@ -122,11 +121,8 @@ class SingleCamera(object):
                        value > max            ,
                        value % increment != 0 ]
 
-        if any(conditions):
+        if any(conditions) or self.cap is None:
             return False
-
-        self.parm_vals[name] = value
-        self.__init__config()
 
         # Load parameters from the .json file
         filepath = 'parameters/' + self.which_cam + '.json'
@@ -139,6 +135,12 @@ class SingleCamera(object):
         # Save parameters to the .json file
         with open(filepath, 'w') as fh:
             json.dump(saved_parameters, fh)
+
+        # Update parameter values in this object
+        self.parm_vals[name] = value
+
+        # Finally, set the hardware
+        self.cap.set(self.parm_ids[name], value)
 
         return True
 

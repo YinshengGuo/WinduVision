@@ -170,7 +170,8 @@ class WinduGUI(QtGui.QMainWindow):
         # For key combinations that need to be connected to the core object
         #    ( method_name         , key combination )
         K = [('toggle_recording'   , 'Ctrl+R'        ),
-             ('toggle_view_mode'   , 'Ctrl+V'        )]
+             ('toggle_view_mode'   , 'Ctrl+V'        ),
+             ('toggle_view_mode'   , 'b'             )]
 
         for method_name, key_comb in K:
             method = self.controller.get_method(method_name)

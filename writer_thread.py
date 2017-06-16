@@ -37,7 +37,6 @@ class WriterThread(AbstractThread):
 
         for name, value in p.items():
             setattr(self, name, value)
-            print name, getattr(self, name)
 
     def main(self):
 

@@ -3,7 +3,7 @@
 "tolerance": 2.5,
 "learn_rate": 0.1,
 "gain_max": 100,
-"gain_min": 50,
+"gain_min": 30,
 "exposure_max": -1,
 "exposure_min": -6
 }
