@@ -1,9 +1,9 @@
 import numpy as np
 import cv2, time, sys, threading, os, json
 from PyQt4 import QtCore, QtGui
-from windu_gui import *
-from windu_controller import *
-from windu_constants import *
+from root_gui_modules import *
+from root_controller import *
+from root_constants import *
 
 
 

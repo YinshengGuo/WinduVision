@@ -1,4 +1,10 @@
 '''
+--- This is version 10.2 ---
+
+    Changed the file names from windu_* to root_*, which is more generic
+
+
+
 --- This is version 10.1 ---
 
     Change camera tuning sliders to real-time camera setting effect.
@@ -420,7 +426,7 @@
 '''
 
 if __name__ == '__main__':
-    from windu_model import *
+    from root_model import *
     app = QtGui.QApplication(sys.argv)
     core = WinduCore()
     sys.exit(app.exec_())

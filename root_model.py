@@ -2,10 +2,10 @@ import numpy as np
 import cv2, time, sys, threading, json
 from OpenGL import GL
 
-from windu_view import *
-from windu_controller import *
-from windu_threads import *
-from windu_constants import *
+from root_view import *
+from root_controller import *
+from root_thread_modules import *
+from root_constants import *
 from single_camera import *
 from stereo import Stereo as stereo
 
