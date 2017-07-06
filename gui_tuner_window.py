@@ -104,15 +104,14 @@ class TunerWindow(QtGui.QWidget):
         '''
         Set the widget slider value
         '''
-        # If the name is not present in self.parameters
-        #   then just return
+        # If the name is not present in self.parameters then do nothing
         if self.widgets.get(name, None) is None:
             return
         self.widgets[name].setValue(value)
 
     def apply_parameter(self, name, value):
         '''
-        Supposed to be overridden.
+        To be overridden.
         Decides what to do when the child widget method setValue() is called.
         '''
         pass
@@ -157,6 +156,8 @@ class CameraTunerWindow(TunerWindow):
         #   the core object is not ready to configure the camera hardware yet...
         #   therefore do NOT apply parameters to the camera hardware
         self.__init__load_parameters()
+        # When initiation is done, the core object is ready...
+        #   so the parameter can be applied to configure the camera hardware
         self.isApplying = True
 
     def __init__load_parameters(self):
@@ -176,6 +177,7 @@ class CameraTunerWindow(TunerWindow):
         Transfers parameters to the core object via the controller.
         '''
 
+        # Decides whether or not to apply the parameter to configure the camera hardware
         if not self.isApplying:
             return
 
@@ -186,7 +188,8 @@ class CameraTunerWindow(TunerWindow):
                                              arg = data                     )
 
     def auto_cam_resumed(self):
-        # When camera is in auto mode, we only want the GUI sliders to DISPLAY the parameter,
+        # When camera is in auto mode,
+        #   we only want the GUI sliders to DISPLAY the parameter but NOT configuring cameras
         #   so do NOT apply parameters to the camera hardware
         self.isApplying = False
 
@@ -196,23 +199,18 @@ class CameraTunerWindow(TunerWindow):
 
 
 class CameraTunerWindowSet(object):
-    def __init__(self, controller):
-        self.controller = controller
+    '''
+    This class encapsulates the three CameraTunerWindow: CAM_R, CAM_L, CAM_E
 
+    This class should have the basic methods (interface) that the CameraTunerWindow has...
+      for external method calling
+    '''
+    def __init__(self, controller):
         self.windows = {}
+        # Instantiate three CameraTunerWindow objects
+        # Collect them in a dictionary
         for cam in [CAM_R, CAM_L, CAM_E]:
             self.windows[cam] = CameraTunerWindow(controller=controller, which_cam=cam)
-
-    def auto_cam_resumed(self):
-        for win in self.windows.values():
-            win.auto_cam_resumed()
-
-    def auto_cam_paused(self):
-        for win in self.windows.values():
-            win.auto_cam_paused()
-
-    def set_parameter(self, which_cam, name, value):
-        self.windows[which_cam].set_parameter(name, value)
 
     def show(self):
         for i, win in enumerate(self.windows.values()):
@@ -226,6 +224,17 @@ class CameraTunerWindowSet(object):
     def close(self):
         for win in self.windows.values():
             win.close()
+
+    def set_parameter(self, which_cam, name, value):
+        self.windows[which_cam].set_parameter(name, value)
+
+    def auto_cam_resumed(self):
+        for win in self.windows.values():
+            win.auto_cam_resumed()
+
+    def auto_cam_paused(self):
+        for win in self.windows.values():
+            win.auto_cam_paused()
 
 
 

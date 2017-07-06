@@ -1,11 +1,18 @@
 '''
---- This is version 10.2 ---
+--- This is version 10.3 ---
+
+    Bug fix in single_camera.py:
+        The parameter .json file should not be accessed too frequently to avoid file opening conflict.
+
+
+
+--- Version 10.2 ---
 
     Changed the file names from windu_* to root_*, which is more generic
 
 
 
---- This is version 10.1 ---
+--- Version 10.1 ---
 
     Change camera tuning sliders to real-time camera setting effect.
 
@@ -14,7 +21,7 @@
 
 
 
---- This is version 9.11 ---
+--- Version 9.11 ---
 
     Added the short cut "b" for USB foot pedal to switch view mode.
 
