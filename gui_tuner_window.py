@@ -18,19 +18,20 @@ class SliderWidget(QtGui.QWidget):
     def __init__(self, parent, name, min, max, value, interval):
         super(SliderWidget, self).__init__(parent)
 
+        self.parent = parent
         self.name = name
         self.min = min
         self.max = max
         self.value = value
         self.interval = interval
 
+        self.QLabel_name = QtGui.QLabel(self) # QLabel showing name
+        self.QLabel_value = QtGui.QLabel(self) # QLabel showing value
+        self.QSlider = QtGui.QSlider(QtCore.Qt.Horizontal, self) # QSlider
+
+        # Create and set H box layout
         self.hbox = QtGui.QHBoxLayout()
-        self.QLabel_name = QtGui.QLabel(self)
-        self.QLabel_value = QtGui.QLabel(self)
-        self.QSlider = QtGui.QSlider(QtCore.Qt.Horizontal, self)
-
         self.setLayout(self.hbox)
-
         self.hbox.addWidget(self.QLabel_name)
         self.hbox.addWidget(self.QLabel_value)
         self.hbox.addWidget(self.QSlider)
@@ -48,7 +49,6 @@ class SliderWidget(QtGui.QWidget):
         self.QSlider.valueChanged.connect(self.setValue)
 
     def setValue(self, value):
-
         # Round the value to fit the interval
         value = value - self.min
         value = round( value / float(self.interval) ) * self.interval
@@ -57,6 +57,10 @@ class SliderWidget(QtGui.QWidget):
         self.value = value
         self.QSlider.setValue(value)
         self.QLabel_value.setText(str(value))
+
+        # Notify the parent.
+        # Let the parent decide what to do with the value changed.
+        self.parent.apply_parameter(self.name, value)
 
 
 
@@ -75,44 +79,10 @@ class TunerWindow(QtGui.QWidget):
     def __init__(self):
         super(TunerWindow, self).__init__()
 
-        # self.setMinimumWidth(600)
-        # self.setMaximumWidth(600)
-
         self.main_vbox = QtGui.QVBoxLayout()
         self.setLayout(self.main_vbox)
 
-        self.btn_hbox = QtGui.QHBoxLayout()
-        self.main_vbox.addLayout(self.btn_hbox)
-
-        K = [('ok'    ,'OK'    ),
-             ('cancel','Cancel'),
-             ('apply' ,'Apply' )]
-
-        self.btn = {}
-
-        for key, name in K:
-            self.btn[key] = QtGui.QPushButton(name, self)
-            self.btn[key].clicked.connect(getattr(self, key))
-            self.btn_hbox.addWidget( self.btn[key] )
-
-        self.parameters = []
-
-    def apply_parameter(self):
-        '''
-        Supposed to be overridden.
-        Defines what to do when ok() or apply() are called.
-        '''
-        pass
-
-    def ok(self):
-        self.apply_parameter()
-        self.hide()
-
-    def cancel(self):
-        self.hide()
-
-    def apply(self):
-        self.apply_parameter()
+        self.widgets = {} # a dictionary of widgets, indexed by the name of each parameter
 
     def add_parameter(self, name, min, max, value, interval):
         '''
@@ -125,16 +95,137 @@ class TunerWindow(QtGui.QWidget):
                               value    = value,
                               interval = interval)
 
-        self.parameters.append(widget)
-
-        self.main_vbox.insertWidget(len(self.main_vbox)-1, widget)
+        # Add the widget to the dictionary
+        self.widgets[name] = widget
+        # Add the widget to the V box
+        self.main_vbox.insertWidget(len(self.main_vbox), widget)
 
     def set_parameter(self, name, value):
+        '''
+        Set the widget slider value
+        '''
+        # If the name is not present in self.parameters
+        #   then just return
+        if self.widgets.get(name, None) is None:
+            return
+        self.widgets[name].setValue(value)
 
-        # Iterate over all widgets to search for the widget that has the matched name
-        for widget in self.parameters:
-            if widget.name == name:
-                widget.setValue(value)
+    def apply_parameter(self, name, value):
+        '''
+        Supposed to be overridden.
+        Decides what to do when the child widget method setValue() is called.
+        '''
+        pass
+
+
+
+class CameraTunerWindow(TunerWindow):
+    '''
+    Inherits from the TunerWindow class.
+
+    The business logics for the camera imaging parameters is specified in this class.
+
+    This class also manages the transfer of camera parameters to the core object.
+    '''
+    def __init__(self, controller, which_cam):
+        super(CameraTunerWindow, self).__init__()
+
+        self.controller = controller
+        self.which_cam = which_cam
+
+        self.setWindowIcon(QtGui.QIcon('icons/windu_vision.png'))
+        self.setMinimumWidth(600)
+
+        title = {CAM_R: 'Right Camera'  ,
+                 CAM_L: 'Left Camera'   ,
+                 CAM_E: 'Ambient Camera'}
+
+        self.setWindowTitle(title[which_cam])
+
+        self.add_parameter(name='brightness'    , min=0   , max=255 , value=0   , interval=5  )
+        self.add_parameter(name='contrast'      , min=0   , max=255 , value=0   , interval=5  )
+        self.add_parameter(name='saturation'    , min=0   , max=255 , value=0   , interval=5  )
+        self.add_parameter(name='gain'          , min=0   , max=127 , value=0   , interval=1  )
+        self.add_parameter(name='exposure'      , min=-7  , max=-1  , value=-7  , interval=1  )
+        self.add_parameter(name='white_balance' , min=3000, max=6500, value=3000, interval=100)
+        self.add_parameter(name='focus'         , min=0   , max=255 , value=0   , interval=5  )
+
+        # self.isApplying is a boolean that decides whether or not...
+        #   to apply the parameter to the camera hardware
+        self.isApplying = False
+        # When initiating GUI, i.e. executing self.__init__load_parameters()...
+        #   the core object is not ready to configure the camera hardware yet...
+        #   therefore do NOT apply parameters to the camera hardware
+        self.__init__load_parameters()
+        self.isApplying = True
+
+    def __init__load_parameters(self):
+        '''
+        Load parameters from the .json file, and set the values of the QSliders
+        '''
+        filepath = 'parameters/' + self.which_cam + '.json'
+        with open(filepath, 'r') as fh:
+            parameters = json.loads(fh.read())
+
+        for name, value in parameters.items():
+            self.set_parameter(name, value)
+
+    def apply_parameter(self, name, value):
+        '''
+        Called by the child widget method applyValue().
+        Transfers parameters to the core object via the controller.
+        '''
+
+        if not self.isApplying:
+            return
+
+        data = {'which_cam': self.which_cam,
+                'parameters': {name: value}}
+
+        self.controller.call_method( method_name = 'apply_camera_parameters',
+                                             arg = data                     )
+
+    def auto_cam_resumed(self):
+        # When camera is in auto mode, we only want the GUI sliders to DISPLAY the parameter,
+        #   so do NOT apply parameters to the camera hardware
+        self.isApplying = False
+
+    def auto_cam_paused(self):
+        self.isApplying = True
+
+
+
+class CameraTunerWindowSet(object):
+    def __init__(self, controller):
+        self.controller = controller
+
+        self.windows = {}
+        for cam in [CAM_R, CAM_L, CAM_E]:
+            self.windows[cam] = CameraTunerWindow(controller=controller, which_cam=cam)
+
+    def auto_cam_resumed(self):
+        for win in self.windows.values():
+            win.auto_cam_resumed()
+
+    def auto_cam_paused(self):
+        for win in self.windows.values():
+            win.auto_cam_paused()
+
+    def set_parameter(self, which_cam, name, value):
+        self.windows[which_cam].set_parameter(name, value)
+
+    def show(self):
+        for i, win in enumerate(self.windows.values()):
+            win.move(200+200*i, 200)
+            win.show()
+
+    def hide(self):
+        for win in self.windows.values():
+            win.hide()
+
+    def close(self):
+        for win in self.windows.values():
+            win.close()
 
 
 
@@ -166,80 +257,11 @@ class DepthTunerWindow(TunerWindow):
         Transfers parameters to the core object via the controller.
         '''
         parms = {}
-        for p in self.parameters:
+        for p in self.parameters.values():
             parms[p.name] = p.value
 
         self.controller.call_method( method_name = 'apply_depth_parameters',
                                              arg = parms                   )
 
-
-
-class CameraTunerWindow(TunerWindow):
-    '''
-    Inherits from the TunerWindow class.
-
-    The business logics for the camera imaging parameters
-    is specified in this class.
-
-    This class also manages the transfer of camera parameters
-    to the core object.
-    '''
-    def __init__(self, controller, which_cam):
-        super(CameraTunerWindow, self).__init__()
-
-        self.controller = controller
-        self.which_cam = which_cam
-
-        self.setWindowIcon(QtGui.QIcon('icons/windu_vision.png'))
-        self.setMinimumWidth(600)
-
-        if which_cam == CAM_R:
-            title = 'Right Camera'
-        elif which_cam == CAM_L:
-            title = 'Left Camera'
-        else:
-            title = 'Ambient Camera'
-
-        self.setWindowTitle(title)
-
-        filepath = 'parameters/' + which_cam + '.json'
-        with open(filepath, 'r') as fh:
-            parms = json.loads(fh.read())
-
-        self.add_parameter(name='brightness'    , min=0   , max=255 , value=parms['brightness']   , interval=5  )
-        self.add_parameter(name='contrast'      , min=0   , max=255 , value=parms['contrast']     , interval=5  )
-        self.add_parameter(name='saturation'    , min=0   , max=255 , value=parms['saturation']   , interval=5  )
-        self.add_parameter(name='gain'          , min=0   , max=127 , value=parms['gain']         , interval=1  )
-        self.add_parameter(name='exposure'      , min=-7  , max=-1  , value=parms['exposure']     , interval=1  )
-        self.add_parameter(name='white_balance' , min=3000, max=6500, value=parms['white_balance'], interval=100)
-        self.add_parameter(name='focus'         , min=0   , max=255 , value=parms['focus']        , interval=5  )
-
-    def apply_parameter(self):
-        '''
-        Transfers parameters to the core object via the controller.
-        '''
-        parms = {}
-        for p in self.parameters:
-            parms[p.name] = p.value
-
-        data = {'which_cam': self.which_cam, 'parameters': parms}
-
-        self.controller.call_method( method_name = 'apply_camera_parameters',
-                                             arg = data                     )
-
-    def update_parameter(self, name=None):
-
-        filepath = 'parameters/' + self.which_cam + '.json'
-        with open(filepath, 'r') as fh:
-            parameters = json.loads(fh.read())
-
-        # Update all parameter values in the slider...
-        #     if no name is passed in
-        if name == None:
-            for name, value in parameters.items():
-                self.set_parameter(name, value)
-
-        else:
-            self.set_parameter(name=name, value=parameters[name])
 
 

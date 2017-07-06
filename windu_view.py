@@ -70,19 +70,15 @@ class WinduGUI(QtGui.QMainWindow):
 
         self.info_window = TextWindow()
         self.progress_bar = ProgressBar()
-        self.gl_window = GLWindow( controller = self.controller )
-        self.depth_tuner_window = DepthTunerWindow( controller = self.controller )
-        self.camera_tuner_window_R = CameraTunerWindow( controller=self.controller, which_cam=CAM_R )
-        self.camera_tuner_window_L = CameraTunerWindow( controller=self.controller, which_cam=CAM_L )
-        self.camera_tuner_window_E = CameraTunerWindow( controller=self.controller, which_cam=CAM_E )
+        self.gl_window = GLWindow(controller=self.controller)
+        self.depth_tuner_window = DepthTunerWindow(controller=self.controller)
+        self.camera_tuner_window_set = CameraTunerWindowSet(controller=self.controller)
 
-        self.all_windows = [self.info_window          ,
-                            self.progress_bar         ,
-                            self.gl_window            ,
-                            self.depth_tuner_window   ,
-                            self.camera_tuner_window_R,
-                            self.camera_tuner_window_L,
-                            self.camera_tuner_window_E]
+        self.all_windows = [self.info_window            ,
+                            self.progress_bar           ,
+                            self.gl_window              ,
+                            self.depth_tuner_window     ,
+                            self.camera_tuner_window_set]
 
     def __init__toolbars(self):
         self.toolbar = QtGui.QToolBar('Tool Bar')
@@ -210,17 +206,7 @@ class WinduGUI(QtGui.QMainWindow):
         self.depth_tuner_window.show()
 
     def open_camera_tuner(self):
-        L = self.camera_tuner_window_L
-        R = self.camera_tuner_window_R
-        E = self.camera_tuner_window_E
-
-        L.move(200, 200)
-        R.move(400, 200)
-        E.move(600, 200)
-
-        for window in [L, R, E]:
-            window.update_parameter()
-            window.show()
+        self.camera_tuner_window_set.show()
 
     def toggle_fullscreen(self):
         if self.isFullScreen():
@@ -415,10 +401,14 @@ class WinduGUI(QtGui.QMainWindow):
 
         self.actions['toggle_auto_cam'].setText('Stop Camera Auto Mode')
 
+        self.camera_tuner_window_set.auto_cam_resumed()
+
     def auto_cam_paused(self):
         self.auto_cam_animator.stop()
         self.actions['toggle_auto_cam'].setIcon(QtGui.QIcon('icons/toggle_auto_cam.png'))
         self.actions['toggle_auto_cam'].setText('Camera Auto Mode')
+
+        self.camera_tuner_window_set.auto_cam_paused()
 
     def set_info_text(self, data):
         self.info_window.setText(data['line'], data['text'])
@@ -493,16 +483,10 @@ class WinduGUI(QtGui.QMainWindow):
         self.controller.call_method(method_name = 'start_video_thread')
 
     def update_cam_parm(self, data):
-
         which_cam = data['which_cam']
         name = data['name']
-
-        if which_cam == CAM_R:
-            self.camera_tuner_window_R.update_parameter(name)
-        elif which_cam == CAM_L:
-            self.camera_tuner_window_L.update_parameter(name)
-        else:
-            self.camera_tuner_window_E.update_parameter(name)
+        value = data['value']
+        self.camera_tuner_window_set.set_parameter(which_cam, name, value)
 
     def set_time_label(self, text):
         self.time_label_R.setText(text)

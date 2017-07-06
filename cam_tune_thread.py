@@ -117,13 +117,14 @@ class CamTuneThread(AbstractThread):
     def set_cam(self, name, value):
         ret = self.cap_thread.set_one_cam_parm(name, value)
         if ret:
-            self.update_gui(name)
+            self.update_gui(name, value)
 
-    def update_gui(self, name):
+    def update_gui(self, name, value):
         which_cam = self.cap_thread.get_which_cam()
 
         data = {'which_cam': which_cam,
-                'name': name}
+                'name'     : name     ,
+                'value'    : value    }
 
         self.mediator.emit_signal('update_cam_parm', data)
 

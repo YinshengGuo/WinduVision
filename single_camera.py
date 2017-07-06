@@ -46,8 +46,6 @@ class SingleCamera(object):
         with open(filepath, 'r') as fh:
             self.parm_vals = json.loads(fh.read())
 
-
-
         # Define other operational parameters
         if self.which_cam == CAM_R:
             self.rotation = 3

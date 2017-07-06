@@ -1,4 +1,13 @@
 '''
+--- This is version 10.1 ---
+
+    Change camera tuning sliders to real-time camera setting effect.
+
+    The structure of cam_tune_thread.py has been changed dramatically
+        to implement the dynamic behavior.
+
+
+
 --- This is version 9.11 ---
 
     Added the short cut "b" for USB foot pedal to switch view mode.
