@@ -1,5 +1,16 @@
 '''
---- This is version 10.3 ---
+--- This is version 10.4 ---
+
+    Major changes in:
+        gui_tuner_window.py
+        cam_tune_thread.py
+        cam_equal_thread.py
+
+    To implement synchronized right and left camera slider control
+
+
+
+--- Version 10.3 ---
 
     Bug fix in single_camera.py:
         The parameter .json file should not be accessed too frequently to avoid file opening conflict.

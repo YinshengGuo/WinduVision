@@ -46,21 +46,27 @@ class SliderWidget(QtGui.QWidget):
         self.QSlider.setTickInterval(interval)
         self.QSlider.setTickPosition(QtGui.QSlider.TicksBelow)
 
-        self.QSlider.valueChanged.connect(self.setValue)
+        self.QSlider.sliderReleased.connect(self.slider_released)
 
-    def setValue(self, value):
+    def slider_released(self):
+        value = self.QSlider.value()
         # Round the value to fit the interval
         value = value - self.min
         value = round( value / float(self.interval) ) * self.interval
         value = int( value + self.min )
 
         self.value = value
-        self.QSlider.setValue(value)
         self.QLabel_value.setText(str(value))
 
-        # Notify the parent.
-        # Let the parent decide what to do with the value changed.
-        self.parent.apply_parameter(self.name, value)
+        # Notify the parent that the user changed the value with mouse.
+        # Let the parent decide what to do with the gui event.
+        self.parent.user_changed_value(self.name, value)
+
+    def set_value(self, value):
+        if value >= self.min and value <= self.max:
+            self.value = value
+            self.QSlider.setValue(value)
+            self.QLabel_value.setText(str(value))
 
 
 
@@ -79,8 +85,8 @@ class TunerWindow(QtGui.QWidget):
     def __init__(self):
         super(TunerWindow, self).__init__()
 
-        self.main_vbox = QtGui.QVBoxLayout()
-        self.setLayout(self.main_vbox)
+        self.vbox = QtGui.QVBoxLayout()
+        self.setLayout(self.vbox)
 
         self.widgets = {} # a dictionary of widgets, indexed by the name of each parameter
 
@@ -98,7 +104,10 @@ class TunerWindow(QtGui.QWidget):
         # Add the widget to the dictionary
         self.widgets[name] = widget
         # Add the widget to the V box
-        self.main_vbox.insertWidget(len(self.main_vbox), widget)
+        self.vbox.insertWidget(len(self.vbox), widget)
+
+    def add_widget(self, widget):
+        self.vbox.insertWidget(len(self.vbox), widget)
 
     def set_parameter(self, name, value):
         '''
@@ -107,12 +116,12 @@ class TunerWindow(QtGui.QWidget):
         # If the name is not present in self.parameters then do nothing
         if self.widgets.get(name, None) is None:
             return
-        self.widgets[name].setValue(value)
+        self.widgets[name].set_value(value)
 
-    def apply_parameter(self, name, value):
+    def user_changed_value(self, name, value):
         '''
         To be overridden.
-        Decides what to do when the child widget method setValue() is called.
+        Decides what to do when the child widget method set_value() is called.
         '''
         pass
 
@@ -126,11 +135,12 @@ class CameraTunerWindow(TunerWindow):
 
     This class also manages the transfer of camera parameters to the core object.
     '''
-    def __init__(self, controller, which_cam):
+    def __init__(self, controller, which_cam, paired, parent):
         super(CameraTunerWindow, self).__init__()
 
         self.controller = controller
         self.which_cam = which_cam
+        self.parent = parent
 
         self.setWindowIcon(QtGui.QIcon('icons/windu_vision.png'))
         self.setMinimumWidth(600)
@@ -138,27 +148,15 @@ class CameraTunerWindow(TunerWindow):
         title = {CAM_R: 'Right Camera'  ,
                  CAM_L: 'Left Camera'   ,
                  CAM_E: 'Ambient Camera'}
-
         self.setWindowTitle(title[which_cam])
 
-        self.add_parameter(name='brightness'    , min=0   , max=255 , value=0   , interval=5  )
-        self.add_parameter(name='contrast'      , min=0   , max=255 , value=0   , interval=5  )
-        self.add_parameter(name='saturation'    , min=0   , max=255 , value=0   , interval=5  )
-        self.add_parameter(name='gain'          , min=0   , max=127 , value=0   , interval=1  )
-        self.add_parameter(name='exposure'      , min=-7  , max=-1  , value=-7  , interval=1  )
-        self.add_parameter(name='white_balance' , min=3000, max=6500, value=3000, interval=100)
-        self.add_parameter(name='focus'         , min=0   , max=255 , value=0   , interval=5  )
-
-        # self.isApplying is a boolean that decides whether or not...
-        #   to apply the parameter to the camera hardware
-        self.isApplying = False
-        # When initiating GUI, i.e. executing self.__init__load_parameters()...
-        #   the core object is not ready to configure the camera hardware yet...
-        #   therefore do NOT apply parameters to the camera hardware
         self.__init__load_parameters()
-        # When initiation is done, the core object is ready...
-        #   so the parameter can be applied to configure the camera hardware
-        self.isApplying = True
+
+        if paired:
+            self.sync_box = QtGui.QCheckBox(parent=self)
+            self.sync_box.setText('Sync Control')
+            self.sync_box.toggled.connect(self.user_changed_sync)
+            self.add_widget(self.sync_box)
 
     def __init__load_parameters(self):
         '''
@@ -166,19 +164,38 @@ class CameraTunerWindow(TunerWindow):
         '''
         filepath = 'parameters/' + self.which_cam + '.json'
         with open(filepath, 'r') as fh:
-            parameters = json.loads(fh.read())
+            P = json.loads(fh.read())
 
-        for name, value in parameters.items():
-            self.set_parameter(name, value)
+        self.add_parameter(name='brightness'    , min=0   , max=255 , value=P['brightness'   ], interval=5  )
+        self.add_parameter(name='contrast'      , min=0   , max=255 , value=P['contrast'     ], interval=5  )
+        self.add_parameter(name='saturation'    , min=0   , max=255 , value=P['saturation'   ], interval=5  )
+        self.add_parameter(name='gain'          , min=0   , max=127 , value=P['gain'         ], interval=1  )
+        self.add_parameter(name='exposure'      , min=-7  , max=-1  , value=P['exposure'     ], interval=1  )
+        self.add_parameter(name='white_balance' , min=3000, max=6500, value=P['white_balance'], interval=100)
+        self.add_parameter(name='focus'         , min=0   , max=255 , value=P['focus'        ], interval=5  )
 
-    def apply_parameter(self, name, value):
+        self.isManual = {}
+        for name in ['brightness', 'contrast', 'saturation', 'gain', 'exposure', 'white_balance', 'focus']:
+            self.isManual[name] = True
+
+    def user_changed_sync(self):
+        self.parent.user_changed_sync(self.which_cam, self.sync_box.isChecked())
+
+    def set_sync(self, isChecked):
+        self.sync_box.setChecked(isChecked)
+
+    def user_changed_value(self, name, value):
         '''
-        Called by the child widget method applyValue().
+        Called by the child widget method slider_released().
         Transfers parameters to the core object via the controller.
         '''
+        self.parent.user_changed_value(self.which_cam, name, value)
+        self.apply_parameter(name, value)
+
+    def apply_parameter(self, name, value):
 
         # Decides whether or not to apply the parameter to configure the camera hardware
-        if not self.isApplying:
+        if not self.isManual[name]:
             return
 
         data = {'which_cam': self.which_cam,
@@ -188,13 +205,20 @@ class CameraTunerWindow(TunerWindow):
                                              arg = data                     )
 
     def auto_cam_resumed(self):
-        # When camera is in auto mode,
-        #   we only want the GUI sliders to DISPLAY the parameter but NOT configuring cameras
-        #   so do NOT apply parameters to the camera hardware
-        self.isApplying = False
+        '''
+        Auto camera tuning mainly works on gain and exposure
+        So set these two parameters to NOT manual mode...
+            to prevent user from changing it
+        '''
+        for name in ['gain', 'exposure']:
+            self.isManual[name] = False
 
     def auto_cam_paused(self):
-        self.isApplying = True
+        '''
+        Change gain and exposure back to manual mode
+        '''
+        for name in ['gain', 'exposure']:
+            self.isManual[name] = True
 
 
 
@@ -206,11 +230,16 @@ class CameraTunerWindowSet(object):
       for external method calling
     '''
     def __init__(self, controller):
+        self.isSync = False
+
         self.windows = {}
         # Instantiate three CameraTunerWindow objects
         # Collect them in a dictionary
-        for cam in [CAM_R, CAM_L, CAM_E]:
-            self.windows[cam] = CameraTunerWindow(controller=controller, which_cam=cam)
+
+        self.windows[CAM_R] = CameraTunerWindow(controller, CAM_R, paired=True , parent=self)
+        self.windows[CAM_L] = CameraTunerWindow(controller, CAM_L, paired=True , parent=self)
+        self.windows[CAM_E] = CameraTunerWindow(controller, CAM_E, paired=False, parent=self)
+        self.isSync = False
 
     def show(self):
         for i, win in enumerate(self.windows.values()):
@@ -235,6 +264,22 @@ class CameraTunerWindowSet(object):
     def auto_cam_paused(self):
         for win in self.windows.values():
             win.auto_cam_paused()
+
+    def user_changed_value(self, which_cam, name, value):
+        if which_cam == CAM_L and self.isSync:
+            self.windows[CAM_R].set_parameter(name, value)
+            self.windows[CAM_R].apply_parameter(name, value)
+
+        elif which_cam == CAM_R and self.isSync:
+            self.windows[CAM_L].set_parameter(name, value)
+            self.windows[CAM_L].apply_parameter(name, value)
+
+    def user_changed_sync(self, which_cam, isChecked):
+        if which_cam == CAM_L:
+            self.windows[CAM_R].set_sync(isChecked)
+        if which_cam == CAM_R:
+            self.windows[CAM_L].set_sync(isChecked)
+        self.isSync = isChecked
 
 
 
@@ -261,7 +306,7 @@ class DepthTunerWindow(TunerWindow):
         self.add_parameter(name='ndisparities', min=0, max=160, value=32, interval=16)
         self.add_parameter(name='SADWindowSize', min=5, max=105, value=31, interval=2)
 
-    def apply_parameter(self):
+    def user_changed_value(self):
         '''
         Transfers parameters to the core object via the controller.
         '''

@@ -53,38 +53,67 @@ class CamTuneThread(AbstractThread):
 
         # Do nothing if difference is within tolerated range, so slow down and return
         if abs(diff) <= self.tolerance:
+            # Update the gui to display the correct values
+            self.update_gui(name='gain', value=gain)
+            self.update_gui(name='exposure', value=exposure)
             time.sleep(1)
             return
 
+
+
+        # ------ Adjusting GAIN ------ #
         # Dynamically adjust gain according to the difference
         if diff > self.tolerance:
             gain += (int(diff * self.learn_rate) + 1)
         elif diff < (-1 * self.tolerance):
             gain += (int(diff * self.learn_rate) - 1)
 
+
+
+        # ------ Set GAIN ------ #
         # If the adjusted gain is within the allowed range
         # Set gain and quickly move on to the next iteration
-        if self.gain_min < gain and gain < self.gain_max:
+        if gain >= self.gain_min and gain <= self.gain_max:
             self.set_cam(name='gain', value=gain)
             time.sleep(0.05) # Speed up for the next iteration
             return
 
+
+
+        # ------ GAIN out of range  ------ #
+        # ------ Adjusting EXPOSURE ------ #
         # If gain out of range, adjust exposure
         if gain > self.gain_max:
             exposure = exposure - 1 # exposure brighter
+            # Update the gui to display the boundary (max) value
+            self.update_gui(name='gain', value=self.gain_max)
         elif gain < self.gain_min:
             exposure = exposure + 1 # exposure darker
+            # Update the gui to display the boundary (min) value
+            self.update_gui(name='gain', value=self.gain_min)
 
-        # Nothing to do if the exposure is out of range, so slow down and return
-        if exposure < self.exposure_min or exposure > self.exposure_max:
-            time.sleep(1)
+
+
+        # ------ Set EXPOSURE ------ #
+        if exposure >= self.exposure_min and exposure <= self.exposure_max:
+            gain = (self.gain_min + self.gain_max) / 2 # Since gain is out of range, set it to the mid value
+            self.set_cam(name='gain', value=gain)
+            self.set_cam(name='exposure', value=exposure)
+            time.sleep(0.1) # Takes a while before the exposure change takes effect
             return
 
-        # Since gain is out of range, set it to the mid value
-        gain = (self.gain_min + self.gain_max) / 2
-        self.set_cam(name='gain', value=gain)
-        self.set_cam(name='exposure', value=exposure)
-        time.sleep(0.1) # Takes a while before the exposure change takes effect
+
+
+        # ------ EXPOSURE out of range ------ #
+        # ------ Do nothing in the end ------ #
+        # Nothing to do if the exposure is out of range, so slow down and return
+        if exposure > self.exposure_max:
+            # Update the gui to display the boundary (max) value
+            self.update_gui(name='exposure', value=self.exposure_max)
+        elif exposure < self.exposure_min:
+            # Update the gui to display the boundary (min) value
+            self.update_gui(name='exposure', value=self.exposure_min)
+        time.sleep(1)
 
     def check_gain(self):
 

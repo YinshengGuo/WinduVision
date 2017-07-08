@@ -80,7 +80,10 @@ class CamEqualThread(AbstractThread):
 
         # Dynamically adjust gain according to the difference
         if abs(diff) <= self.tolerance:
-            return # Do nothing if it's within tolerated range
+            # Do nothing if it's within tolerated range
+            # Update the gui to display the correct value
+            self.update_gui(name='gain', value=gain_L)
+            return
 
         elif diff > self.tolerance:
             gain_L += (int(diff * self.learn_rate) + 1)
@@ -90,10 +93,16 @@ class CamEqualThread(AbstractThread):
 
         self.set_camL(name='gain', value=gain_L)
 
-        if gain_L < 0 or gain_L > 127:
-            # There's nothing to do if gain_L is out of range
-            # So slow down the loop
-            time.sleep(1)
+        # There's nothing to do if gain_L is out of range
+        # So slow down the loop and return
+        if gain_L < 0:
+            # Update the gui to display the boundary (min) value
+            self.update_gui(name='gain', value=0)
+        elif gain_L > 127:
+            # Update the gui to display the boundary (max) value
+            self.update_gui(name='gain', value=127)
+        time.sleep(1)
+        return
 
     def emit_info(self, mean):
 
