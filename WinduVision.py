@@ -1,5 +1,11 @@
 '''
---- This is version 10.4 ---
+--- This is version 10.5 ---
+
+    Comments and some minor code refactoring
+
+
+
+--- Version 10.4 ---
 
     Major changes in:
         gui_tuner_window.py

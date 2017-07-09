@@ -1,5 +1,5 @@
 {
-"goal": 80,
+"goal": 127,
 "tolerance": 2.5,
 "learn_rate": 0.1,
 "gain_max": 100,

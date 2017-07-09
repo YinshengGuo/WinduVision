@@ -56,9 +56,12 @@ class CamEqualThread(AbstractThread):
     def tune_left_camera(self):
         '''
         Adjust 'gain' of the left camera to make
-            the average of the left image equals to the average of the right image, i.e. equal brightness.
+            the average of the left image equals to
+            the average of the right image, i.e. equal brightness.
         '''
 
+        # Get the current gain value of the left camera
+        gain_L = self.cap_thread_L.get_one_cam_parm(name='gain')
         imgR = self.get_roi(self.cap_thread_R.get_image())
         imgL = self.get_roi(self.cap_thread_L.get_image())
 
@@ -69,40 +72,34 @@ class CamEqualThread(AbstractThread):
 
         diff = mean_R - mean_L
 
-        # Control the frequency of the main loop according to the difference.
-        if abs(diff) > self.tolerance:
-            time.sleep(0.1)
-        else:
-            time.sleep(1)
-
-        # Get the current gain value of the left camera
-        gain_L = self.cap_thread_L.get_one_cam_parm(name='gain')
-
-        # Dynamically adjust gain according to the difference
         if abs(diff) <= self.tolerance:
             # Do nothing if it's within tolerated range
+            # Slow down and return
+            time.sleep(1)
             # Update the gui to display the correct value
             self.update_gui(name='gain', value=gain_L)
             return
 
-        elif diff > self.tolerance:
+        # Adjust gain according to the difference of image brightness
+        if diff > self.tolerance:
             gain_L += (int(diff * self.learn_rate) + 1)
-
-        else: # diff < - self.tolerance
+        elif diff < -self.tolerance:
             gain_L += (int(diff * self.learn_rate) - 1)
 
-        self.set_camL(name='gain', value=gain_L)
-
-        # There's nothing to do if gain_L is out of range
-        # So slow down the loop and return
+        # If gain_L is out of range (0, 127)
+        #     then there's nothing to do
+        # Slow down and return
         if gain_L < 0:
             # Update the gui to display the boundary (min) value
             self.update_gui(name='gain', value=0)
+            time.sleep(1)
         elif gain_L > 127:
             # Update the gui to display the boundary (max) value
             self.update_gui(name='gain', value=127)
-        time.sleep(1)
-        return
+            time.sleep(1)
+        else: # 0 <= gain_L <= 127, i.e. gain_L within range
+            self.set_camL(name='gain', value=gain_L)
+            time.sleep(0.1)
 
     def emit_info(self, mean):
 

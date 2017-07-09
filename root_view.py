@@ -368,10 +368,13 @@ class WinduGUI(QtGui.QMainWindow):
                                                   directory = 'stereo_video_%03d.avi' % i,
                                                   caption   = 'Save stereo video',
                                                   filter    = 'Audio Video Interleaved (*.avi)')
+
         if fname != '':
             fname = str(fname)
             if not fname.endswith('.avi'):
                 fname = fname + '.avi'
+            if os.path.exists(fname):
+                os.remove(fname)
             os.rename(temp_filename, fname)
 
         else:

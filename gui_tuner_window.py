@@ -49,6 +49,9 @@ class SliderWidget(QtGui.QWidget):
         self.QSlider.sliderReleased.connect(self.slider_released)
 
     def slider_released(self):
+        '''
+        User invoked action (mouse release event) => Notify the parent object
+        '''
         value = self.QSlider.value()
         # Round the value to fit the interval
         value = value - self.min
@@ -56,6 +59,7 @@ class SliderWidget(QtGui.QWidget):
         value = int( value + self.min )
 
         self.value = value
+        self.QSlider.setValue(value)
         self.QLabel_value.setText(str(value))
 
         # Notify the parent that the user changed the value with mouse.
@@ -63,6 +67,12 @@ class SliderWidget(QtGui.QWidget):
         self.parent.user_changed_value(self.name, value)
 
     def set_value(self, value):
+        '''
+        Set the value of self.QSlider and self.QLabel_value
+        Note that this only sets the displayed value without invoking any downstream action
+        This method is not invoked by user interaction
+        This method is only for displaying value
+        '''
         if value >= self.min and value <= self.max:
             self.value = value
             self.QSlider.setValue(value)
@@ -103,10 +113,13 @@ class TunerWindow(QtGui.QWidget):
 
         # Add the widget to the dictionary
         self.widgets[name] = widget
-        # Add the widget to the V box
+        # Insert the widget to the last row of the V box
         self.vbox.insertWidget(len(self.vbox), widget)
 
     def add_widget(self, widget):
+        '''
+        Insert QWidget object to the last row of self.vbox (QVBoxLayout)
+        '''
         self.vbox.insertWidget(len(self.vbox), widget)
 
     def set_parameter(self, name, value):
@@ -121,7 +134,8 @@ class TunerWindow(QtGui.QWidget):
     def user_changed_value(self, name, value):
         '''
         To be overridden.
-        Decides what to do when the child widget method set_value() is called.
+        Decides what to do when the child widget slider_released() method is called...
+            which is invoked upon user mouse action
         '''
         pass
 
@@ -133,7 +147,7 @@ class CameraTunerWindow(TunerWindow):
 
     The business logics for the camera imaging parameters is specified in this class.
 
-    This class also manages the transfer of camera parameters to the core object.
+    This class manages the transfer of camera parameters to the core object.
     '''
     def __init__(self, controller, which_cam, paired, parent):
         super(CameraTunerWindow, self).__init__()
@@ -153,6 +167,8 @@ class CameraTunerWindow(TunerWindow):
         self.__init__load_parameters()
 
         if paired:
+            # If this CameraTunerWindow object is paired to another camera, e.g. left and right cameras
+            #     then add a check box for toggling the synchronization of the two cameras
             self.sync_box = QtGui.QCheckBox(parent=self)
             self.sync_box.setText('Sync Control')
             self.sync_box.toggled.connect(self.user_changed_sync)
@@ -179,9 +195,15 @@ class CameraTunerWindow(TunerWindow):
             self.isManual[name] = True
 
     def user_changed_sync(self):
+        '''
+        User (mouse action) check or uncheck the self.sync_box
+        '''
         self.parent.user_changed_sync(self.which_cam, self.sync_box.isChecked())
 
     def set_sync(self, isChecked):
+        '''
+        Accessed by external object to set the state of self.sync_box
+        '''
         self.sync_box.setChecked(isChecked)
 
     def user_changed_value(self, name, value):
@@ -193,6 +215,10 @@ class CameraTunerWindow(TunerWindow):
         self.apply_parameter(name, value)
 
     def apply_parameter(self, name, value):
+        '''
+        Apply the camera parameter value to the core object throught the controller
+            i.e. configuring the camera hardware
+        '''
 
         # Decides whether or not to apply the parameter to configure the camera hardware
         if not self.isManual[name]:
@@ -207,7 +233,7 @@ class CameraTunerWindow(TunerWindow):
     def auto_cam_resumed(self):
         '''
         Auto camera tuning mainly works on gain and exposure
-        So set these two parameters to NOT manual mode...
+        So set these two parameters to isManual = False...
             to prevent user from changing it
         '''
         for name in ['gain', 'exposure']:
@@ -215,7 +241,7 @@ class CameraTunerWindow(TunerWindow):
 
     def auto_cam_paused(self):
         '''
-        Change gain and exposure back to manual mode
+        Change gain and exposure back to isManual = True
         '''
         for name in ['gain', 'exposure']:
             self.isManual[name] = True
@@ -224,18 +250,16 @@ class CameraTunerWindow(TunerWindow):
 
 class CameraTunerWindowSet(object):
     '''
-    This class encapsulates the three CameraTunerWindow: CAM_R, CAM_L, CAM_E
+    This class possesses the three CameraTunerWindow: CAM_R, CAM_L, CAM_E
 
-    This class should have the basic methods (interface) that the CameraTunerWindow has...
-      for external method calling
+    This class should have the basic methods (interface) that the child CameraTunerWindow has,
+        e.g. show(), hide(), close() ...
     '''
     def __init__(self, controller):
-        self.isSync = False
 
-        self.windows = {}
         # Instantiate three CameraTunerWindow objects
         # Collect them in a dictionary
-
+        self.windows = {}
         self.windows[CAM_R] = CameraTunerWindow(controller, CAM_R, paired=True , parent=self)
         self.windows[CAM_L] = CameraTunerWindow(controller, CAM_L, paired=True , parent=self)
         self.windows[CAM_E] = CameraTunerWindow(controller, CAM_E, paired=False, parent=self)
