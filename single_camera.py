@@ -1,6 +1,6 @@
 import numpy as np
 import cv2, time, sys, threading, json
-from root_constants import *
+from constants import *
 
 
 

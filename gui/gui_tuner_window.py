@@ -1,6 +1,6 @@
 import cv2, time, sys, threading, os, json
 from PyQt4 import QtCore, QtGui, QtOpenGL
-from root_constants import *
+from constants import *
 
 
 

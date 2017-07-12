@@ -1,9 +1,9 @@
 import numpy as np
 import cv2, time, sys, threading, os, json
 from PyQt4 import QtCore, QtGui
-from root_gui_modules import *
-from root_controller import *
-from root_constants import *
+from gui import *
+from controller import *
+from constants import *
 
 
 

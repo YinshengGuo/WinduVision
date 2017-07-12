@@ -1,5 +1,17 @@
 '''
---- This is version 10.5 ---
+--- This is version 10.6 ---
+
+    Significant change of the file folder structure.
+
+    Note that constant.py should be present in the root folder, as well as
+        gui/ and threads/ folders
+
+    This is not optimal but importing scripts from parent folder is
+        too difficult for a locally run script
+
+
+
+--- Version 10.5 ---
 
     Comments and some minor code refactoring
 
@@ -450,7 +462,7 @@
 '''
 
 if __name__ == '__main__':
-    from root_model import *
+    from model import *
     app = QtGui.QApplication(sys.argv)
     core = WinduCore()
     sys.exit(app.exec_())
