@@ -101,8 +101,8 @@ class WinduGUI(QtGui.QMainWindow):
         #    (    keys               ,   names                         , for_developer , connect_to_core )
         K = [('snapshot'             , 'Snapshot (Ctrl+S)'             ,    False      ,      False      ),
              ('toggle_recording'     , 'Record Video (Ctrl+R)'         ,    False      ,      True       ),
-             ('toggle_auto_offset'   , 'Start Auto-alignment'          ,    True       ,      True       ),
-             ('open_info'            , 'Show Real-time Info'           ,    True       ,      False      ),
+             ('toggle_auto_offset'   , 'Start Auto-alignment'          ,    False       ,      True       ),
+             ('open_info'            , 'Show Real-time Info'           ,    False       ,      False      ),
              ('open_gl_window'       , 'Open 3D Viewer'                ,    True       ,      False      ),
              ('toggle_depth_map'     , 'Show Depth Map'                ,    True       ,      True       ),
              ('open_depth_tuner'     , 'Adjust Stereo Depth Parameters',    True       ,      False      ),

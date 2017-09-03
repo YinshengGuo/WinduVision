@@ -134,6 +134,7 @@ class WinduCore(object):
         self.align_thread = AlignThread(process_thread = self.proc_threads[MICRO],
                                               mediator = self.mediator)
         self.align_thread.start()
+        self.align_thread.toggle()
 
     def init_writer_thread(self):
         self.writer_thread = WriterThread(process_thread = self.proc_threads[MICRO],

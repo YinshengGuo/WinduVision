@@ -24,13 +24,9 @@ class AlignThread(AbstractThread):
         self.X = np.zeros((10, ), np.float)
         self.Y = np.zeros((10, ), np.float)
 
-        self.pausing = False
-        self.isPaused = False
-        self.mediator.emit_signal('auto_offset_resumed')
-
     def main(self):
 
-        # Shift by one
+        # Shift the queue by one
         self.X[1:] = self.X[:-1]
         self.Y[1:] = self.Y[:-1]
 
@@ -73,7 +69,7 @@ class AlignThread(AbstractThread):
         return True
 
     def after_paused(self):
-        self.process_thread.set_offset(0, 0)
+        # self.process_thread.set_offset(0, 0)
         self.mediator.emit_signal('auto_offset_paused')
         return True
 

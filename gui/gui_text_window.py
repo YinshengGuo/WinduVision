@@ -4,7 +4,7 @@ from PyQt4 import QtCore, QtGui, QtOpenGL
 
 class TextWindow(QtGui.QWidget):
     def __init__(self):
-        super(TextWindow, self).__init__()
+        super(TextWindow, self).__init__(None, QtCore.Qt.WindowStaysOnTopHint)
 
         self.setWindowTitle('Info')
         self.setWindowIcon(QtGui.QIcon('icons/windu_vision.png'))

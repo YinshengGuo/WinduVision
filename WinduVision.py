@@ -1,5 +1,15 @@
 '''
---- This is version 10.6 ---
+--- This is version 10.7 ---
+
+    Enable the user to access the developer function 'toggle_auto_offset'
+
+    When auto-alignment is disabled, do not set the offset back to 0
+
+    Unlock the info text window and always show on top
+
+
+
+--- Version 10.6 ---
 
     Significant change of the file folder structure.
 
