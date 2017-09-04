@@ -101,8 +101,8 @@ class WinduGUI(QtGui.QMainWindow):
         #    (    keys               ,   names                         , for_developer , connect_to_core )
         K = [('snapshot'             , 'Snapshot (Ctrl+S)'             ,    False      ,      False      ),
              ('toggle_recording'     , 'Record Video (Ctrl+R)'         ,    False      ,      True       ),
-             ('toggle_auto_offset'   , 'Start Auto-alignment'          ,    False       ,      True       ),
-             ('open_info'            , 'Show Real-time Info'           ,    False       ,      False      ),
+             ('toggle_auto_offset'   , 'Start Auto-alignment (Ctrl+A)' ,    False      ,      True       ),
+             ('open_info'            , 'Show Real-time Info'           ,    True       ,      False      ),
              ('open_gl_window'       , 'Open 3D Viewer'                ,    True       ,      False      ),
              ('toggle_depth_map'     , 'Show Depth Map'                ,    True       ,      True       ),
              ('open_depth_tuner'     , 'Adjust Stereo Depth Parameters',    True       ,      False      ),
@@ -161,11 +161,10 @@ class WinduGUI(QtGui.QMainWindow):
             method = getattr(self, method_name)
             QtGui.QShortcut(QtGui.QKeySequence(key_comb), self, method)
 
-
-
         # For key combinations that need to be connected to the core object
         #    ( method_name         , key combination )
         K = [('toggle_recording'   , 'Ctrl+R'        ),
+             ('toggle_auto_offset' , 'Ctrl+A'        ),
              ('toggle_view_mode'   , 'Ctrl+V'        ),
              ('toggle_view_mode'   , 'b'             )]
 
@@ -382,11 +381,11 @@ class WinduGUI(QtGui.QMainWindow):
 
     def auto_offset_resumed(self):
         self.actions['toggle_auto_offset'].setIcon(QtGui.QIcon('icons/pause_auto_offset.png'))
-        self.actions['toggle_auto_offset'].setText('Stop Auto-alignment')
+        self.actions['toggle_auto_offset'].setText('Stop Auto-alignment (Ctrl+A)')
 
     def auto_offset_paused(self):
         self.actions['toggle_auto_offset'].setIcon(QtGui.QIcon('icons/toggle_auto_offset.png'))
-        self.actions['toggle_auto_offset'].setText('Start Auto-alignment')
+        self.actions['toggle_auto_offset'].setText('Start Auto-alignment (Ctrl+A)')
 
     def auto_cam_resumed(self):
 

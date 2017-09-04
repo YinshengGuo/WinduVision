@@ -186,7 +186,7 @@ class ProcessThread(AbstractThread):
         self.mediator.emit_signal( signal_name = 'set_info_text',
                                    arg = data )
 
-    # Methods commanded by the high-level core object.
+    # Below are public methods for higher-level objects
 
     def set_offset(self, offset_x, offset_y):
 
@@ -253,21 +253,28 @@ class ProcessThread(AbstractThread):
             setattr(self, key, value)
 
     def change_display_size(self, width, height):
-
-        # Get to know if this thread (MICRO or AMBIENT) is the active one
-        isActive = not self.isPaused
-
         self.pause()
 
         self.set_display_size(width, height)
         self.set_resize_matrix()
 
-        if isActive: # Resume only if this thread is the active one
-            self.resume()
+        self.resume()
 
     def get_processed_images(self):
         return self.imgR_proc, self.imgL_proc
 
     def get_display_image(self):
         return self.img_display
+
+    def set_cap_threads(self, thread_R, thread_L):
+        self.pause()
+
+        self.cap_thread_R = thread_R
+        self.cap_thread_L = thread_L
+
+        # The input image dimension could be different after switching camera
+        # So reset resize matrix
+        self.set_resize_matrix()
+
+        self.resume()
 

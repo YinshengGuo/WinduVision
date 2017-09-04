@@ -1,5 +1,28 @@
 '''
---- This is version 10.7 ---
+--- This is version 10.8 ---
+
+    Michael reported there was a teffible lag in full-screen mode.
+    I found this lagging problem is only present when running the program with low-power CPU.
+    For example, it happens when I set the Core i7 CPU to "power-efficient mode" which runs at ~1.5 GHz.
+
+    After some debugging I found the problem was due to 2 simultaneously running
+    image processing threads: MICRO and AMBIENT.
+
+    Therefore in this version I functionally merged the 2 imaging processing threads into
+    one single thread, which is active all the time.
+    So there's no need to switch image processing threads when toggling views (MICRO vs. AMBIENT).
+
+    Toggling view was simply done by changing the capture threads (R and L) of the
+    image processing thread.
+
+    Because there's no need to switch image processing threads, the runtime behavior is actually
+    much more simplified when toggling the view mode.
+
+    Code changes were mostly in model.py and proc_thread.py.
+
+
+
+--- Version 10.7 ---
 
     Enable the user to access the developer function 'toggle_auto_offset'
 

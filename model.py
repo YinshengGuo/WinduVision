@@ -57,10 +57,10 @@ class WinduCore(object):
         self.init_cams()
 
         # 3 capture threads
-        self.init_cap_threads()
+        self.init_cap_threads(self.view_mode)
 
         # 2 process threads
-        self.init_proc_threads()
+        self.init_proc_thread()
 
         # 1 camera tuning and 1 camera equalizing thread
         self.init_auto_cam_threads()
@@ -71,8 +71,6 @@ class WinduCore(object):
         # 1 writer thread
         self.init_writer_thread()
 
-        self.set_view_mode(self.view_mode)
-
     def stop_video_thread(self):
         # The order of stopping is the reverse of start_video_thread()...
         #     because the least dependent ones should be closed at last
@@ -81,9 +79,7 @@ class WinduCore(object):
         self.writer_thread.stop()
         self.cam_tune_thread.stop()
         self.cam_equal_thread.stop()
-
-        for thread in self.proc_threads.values():
-            thread.stop()
+        self.proc_thread.stop()
 
         for thread in self.cap_threads.values():
             thread.stop()
@@ -97,83 +93,85 @@ class WinduCore(object):
         for key in [CAM_R, CAM_L, CAM_E]:
             self.cams[key] = SingleCamera(which_cam = key)
 
-    def init_cap_threads(self):
-        'Instantiate and start 3 capture threads'
+    def init_cap_threads(self, mode):
+        '''
+        Instantiate and start 3 capture threads.
+        Depending on the mode, resume different cap_threads (i.e. start main loop in the .run() method):
+            MICRO mode: CAM_R & CAM_L
+            AMBIENT mode: CAM_E & CAM_E
+
+        :parameter
+            mode: MICRO or AMBIENT
+        '''
         self.cap_threads = {}
         for key in [CAM_R, CAM_L, CAM_E]:
             self.cap_threads[key] = CaptureThread(camera = self.cams[key],
                                                 mediator = self.mediator)
             self.cap_threads[key].start()
 
-    def init_proc_threads(self):
-        'Instantiate and start 2 process threads: MICOR and AMBIENT'
-        self.proc_threads = {}
-        # The microscope-view processing thread takes CAM_R and CAM_L capture threads
-        self.proc_threads[MICRO] = ProcessThread(cap_thread_R = self.cap_threads[CAM_R],
-                                                 cap_thread_L = self.cap_threads[CAM_L],
-                                                     mediator = self.mediator)
-        self.proc_threads[MICRO].start()
+        if mode == MICRO:
+            self.cap_threads[CAM_R].resume()
+            self.cap_threads[CAM_L].resume()
+            self.active_cap_thread_R = self.cap_threads[CAM_R]
+            self.active_cap_thread_L = self.cap_threads[CAM_L]
 
-        # The ambient-view processing thread takes CAM_E capture thread for both eyes
-        self.proc_threads[AMBIENT] = ProcessThread(cap_thread_R = self.cap_threads[CAM_E],
-                                                   cap_thread_L = self.cap_threads[CAM_E],
-                                                       mediator = self.mediator)
-        self.proc_threads[AMBIENT].start()
+        elif mode == AMBIENT:
+            self.cap_threads[CAM_E].resume()
+            self.active_cap_thread_R = self.cap_threads[CAM_E]
+            self.active_cap_thread_L = self.cap_threads[CAM_E]
+
+    def init_proc_thread(self):
+        self.proc_thread = ProcessThread(cap_thread_R = self.active_cap_thread_R,
+                                         cap_thread_L = self.active_cap_thread_L,
+                                             mediator = self.mediator)
+
+        self.proc_thread.start()
+        self.proc_thread.resume() # proc_thread starts actively working the main loop by default
 
     def init_auto_cam_threads(self):
-        self.cam_tune_thread = CamTuneThread(cap_thread = self.cap_threads[CAM_R],
+        self.cam_tune_thread = CamTuneThread(cap_thread = self.active_cap_thread_R,
                                                mediator = self.mediator)
         self.cam_tune_thread.start()
 
-        self.cam_equal_thread = CamEqualThread(cap_thread_R = self.cap_threads[CAM_R],
-                                               cap_thread_L = self.cap_threads[CAM_L],
+        self.cam_equal_thread = CamEqualThread(cap_thread_R = self.active_cap_thread_R,
+                                               cap_thread_L = self.active_cap_thread_L,
                                                    mediator = self.mediator)
         self.cam_equal_thread.start()
 
     def init_align_thread(self):
-        self.align_thread = AlignThread(process_thread = self.proc_threads[MICRO],
+        self.align_thread = AlignThread(process_thread = self.proc_thread,
                                               mediator = self.mediator)
         self.align_thread.start()
-        self.align_thread.toggle()
+        # self.align_thread.resume()
 
     def init_writer_thread(self):
-        self.writer_thread = WriterThread(process_thread = self.proc_threads[MICRO],
+        self.writer_thread = WriterThread(process_thread = self.proc_thread,
                                                 mediator = self.mediator)
         self.writer_thread.start()
 
     def set_view_mode(self, mode):
 
-        MICRO_threads = [self.proc_threads[MICRO],
-                         self.cap_threads[CAM_R] ,
-                         self.cap_threads[CAM_L] ]
-
-        AMBIENT_threads = [self.proc_threads[AMBIENT],
-                           self.cap_threads[CAM_E] ]
+        # Do nothing if not changing the mode
+        if mode == self.view_mode:
+            return
 
         if mode == MICRO:
-            for t in AMBIENT_threads:
-                t.pause()
-            for t in MICRO_threads:
-                t.resume()
-
-            self.active_proc_thread = self.proc_threads[MICRO]
+            self.cap_threads[CAM_R].resume()
+            self.cap_threads[CAM_L].resume()
+            self.cap_threads[CAM_E].pause()
             self.active_cap_thread_R = self.cap_threads[CAM_R]
             self.active_cap_thread_L = self.cap_threads[CAM_L]
 
         elif mode == AMBIENT:
-            for t in MICRO_threads:
-                t.pause()
-            for t in AMBIENT_threads:
-                t.resume()
-
-            self.active_proc_thread = self.proc_threads[AMBIENT]
+            self.cap_threads[CAM_R].pause()
+            self.cap_threads[CAM_L].pause()
+            self.cap_threads[CAM_E].resume()
             self.active_cap_thread_R = self.cap_threads[CAM_E]
             self.active_cap_thread_L = self.cap_threads[CAM_E]
 
-        # Update active process thread to...
-        #     the align_thread and writer_thread
-        self.align_thread.set_process_thread(self.active_proc_thread)
-        self.writer_thread.set_process_thread(self.active_proc_thread)
+        # Re-initialize the proc_thread
+        self.proc_thread.set_cap_threads(thread_R = self.active_cap_thread_R,
+                                         thread_L = self.active_cap_thread_L)
 
         # Update active capture threads to...
         #     the camera tuning and equalizing threads
@@ -190,7 +188,7 @@ class WinduCore(object):
     # Methods called by the controller object
 
     def snapshot(self, fname):
-        img = self.active_proc_thread.get_display_image()
+        img = self.proc_thread.get_display_image()
         cv2.imwrite(fname, img)
 
     def toggle_recording(self):
@@ -200,7 +198,6 @@ class WinduCore(object):
         self.align_thread.toggle()
 
     def toggle_view_mode(self):
-
         if self.view_mode == MICRO:
             self.set_view_mode(mode=AMBIENT)
         else:
@@ -213,19 +210,19 @@ class WinduCore(object):
         self.cam_equal_thread.toggle()
 
     def zoom_in(self):
-        self.active_proc_thread.zoom_in()
+        self.proc_thread.zoom_in()
 
     def zoom_out(self):
-        self.active_proc_thread.zoom_out()
+        self.proc_thread.zoom_out()
 
     def stereo_reconstruction(self):
-        self.active_proc_thread.pause()
-        stereo.reconstruction(self.active_proc_thread, self.mediator)
-        self.active_proc_thread.resume()
+        self.proc_thread.pause()
+        stereo.reconstruction(self.proc_thread, self.mediator)
+        self.proc_thread.resume()
 
     def apply_depth_parameters(self, parameters):
 
-        self.active_proc_thread.apply_depth_parameters(parameters)
+        self.proc_thread.apply_depth_parameters(parameters)
 
     def apply_camera_parameters(self, data):
 
@@ -235,15 +232,14 @@ class WinduCore(object):
         self.cap_threads[which_cam].set_camera_parameters(parameters)
 
     def toggle_depth_map(self):
-        self.active_proc_thread.computingDepth = not self.active_proc_thread.computingDepth
+        self.proc_thread.computingDepth = not self.proc_thread.computingDepth
 
     def set_display_size(self, dim):
         '''
         Args:
             dim: a tuple of (width, height)
         '''
-        for t in self.proc_threads.values():
-            t.change_display_size(width=dim[0], height=dim[1])
+        self.proc_thread.change_display_size(width=dim[0], height=dim[1])
 
     def start_select_cam(self):
         self.stop_video_thread()
