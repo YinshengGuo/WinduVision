@@ -1,5 +1,18 @@
 '''
---- This is version 10.8 ---
+--- This is version 10.9 ---
+
+    Merge cam_equal_thread.py into cam_tune_thread.py.
+    So the two cameras are tuned by a single thread.
+    This reduces the total number of actively running threads from 8 down to 7:
+      3 capture threads
+      1 process thread
+      1 camera tuning thread
+      1 align thread
+      1 writer thread
+
+
+
+--- Version 10.8 ---
 
     Michael reported there was a teffible lag in full-screen mode.
     I found this lagging problem is only present when running the program with low-power CPU.

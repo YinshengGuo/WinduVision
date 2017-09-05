@@ -59,11 +59,11 @@ class WinduCore(object):
         # 3 capture threads
         self.init_cap_threads(self.view_mode)
 
-        # 2 process threads
+        # 1 process thread
         self.init_proc_thread()
 
-        # 1 camera tuning and 1 camera equalizing thread
-        self.init_auto_cam_threads()
+        # 1 camera tuning thread
+        self.init_auto_cam_thread()
 
         # 1 align thread
         self.init_align_thread()
@@ -78,7 +78,6 @@ class WinduCore(object):
         self.align_thread.stop()
         self.writer_thread.stop()
         self.cam_tune_thread.stop()
-        self.cam_equal_thread.stop()
         self.proc_thread.stop()
 
         for thread in self.cap_threads.values():
@@ -128,15 +127,11 @@ class WinduCore(object):
         self.proc_thread.start()
         self.proc_thread.resume() # proc_thread starts actively working the main loop by default
 
-    def init_auto_cam_threads(self):
-        self.cam_tune_thread = CamTuneThread(cap_thread = self.active_cap_thread_R,
-                                               mediator = self.mediator)
+    def init_auto_cam_thread(self):
+        self.cam_tune_thread = CamTuneThread(cap_thread_R = self.active_cap_thread_R,
+                                             cap_thread_L = self.active_cap_thread_L,
+                                                 mediator = self.mediator)
         self.cam_tune_thread.start()
-
-        self.cam_equal_thread = CamEqualThread(cap_thread_R = self.active_cap_thread_R,
-                                               cap_thread_L = self.active_cap_thread_L,
-                                                   mediator = self.mediator)
-        self.cam_equal_thread.start()
 
     def init_align_thread(self):
         self.align_thread = AlignThread(process_thread = self.proc_thread,
@@ -175,9 +170,8 @@ class WinduCore(object):
 
         # Update active capture threads to...
         #     the camera tuning and equalizing threads
-        self.cam_tune_thread.set_cap_thread(self.active_cap_thread_R)
-        self.cam_equal_thread.set_cap_threads(thread_R = self.active_cap_thread_R,
-                                              thread_L = self.active_cap_thread_L)
+        self.cam_tune_thread.set_cap_threads(thread_R = self.active_cap_thread_R,
+                                            thread_L = self.active_cap_thread_L)
 
         self.view_mode = mode
 
@@ -207,7 +201,6 @@ class WinduCore(object):
 
     def toggle_auto_cam(self):
         self.cam_tune_thread.toggle()
-        self.cam_equal_thread.toggle()
 
     def zoom_in(self):
         self.proc_thread.zoom_in()
