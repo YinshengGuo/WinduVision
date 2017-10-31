@@ -248,7 +248,12 @@ class ProcessThread(AbstractThread):
             self.set_resize_matrix()
 
     def apply_depth_parameters(self, parameters):
-
+        """
+        Args:
+            parameters: a dictionary with
+                key: str, parameter name
+                value: int, parameter value
+        """
         for key, value in parameters.items():
             setattr(self, key, value)
 
